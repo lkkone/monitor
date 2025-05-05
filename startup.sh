@@ -31,19 +31,6 @@ if [ ! -f /app/data/coolmonitor.db ]; then
     # 复制模板数据库到数据目录
     cp "$TEMPLATE_DB" /app/data/coolmonitor.db
     echo "数据库初始化完成"
-    
-    # 生成随机密钥并创建.env文件
-    if [ ! -f /app/data/.env ]; then
-      echo "创建.env文件到数据目录..."
-      RANDOM_SECRET=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
-      echo "# NextAuth.js 密钥" > /app/data/.env
-      echo "NEXTAUTH_SECRET=$RANDOM_SECRET" >> /app/data/.env
-      echo ".env文件已创建到数据目录"
-      
-      # 复制.env文件到应用目录
-      cp /app/data/.env /app/.env
-      echo ".env文件已复制到应用目录"
-    fi
   else
     echo "警告：未找到模板数据库，创建空数据库文件..."
     # 创建空数据库文件，让应用可以启动
@@ -52,6 +39,19 @@ if [ ! -f /app/data/coolmonitor.db ]; then
   fi
 else
   echo "数据库文件已存在，无需初始化"
+fi
+
+# 检查是否需要创建.env文件（无论数据库是否存在）
+if [ ! -f /app/data/.env ]; then
+  echo "创建.env文件到数据目录..."
+  RANDOM_SECRET=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+  echo "# NextAuth.js 密钥" > /app/data/.env
+  echo "NEXTAUTH_SECRET=$RANDOM_SECRET" >> /app/data/.env
+  echo ".env文件已创建到数据目录"
+  
+  # 复制.env文件到应用目录
+  cp /app/data/.env /app/.env
+  echo ".env文件已复制到应用目录"
 fi
 
 # 启动应用
