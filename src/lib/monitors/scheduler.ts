@@ -58,18 +58,58 @@ export async function scheduleMonitor(monitorId: string) {
     `;
 
     // 使用Croner创建新的计划任务
-    const job = new Cron(`*/${monitorData.interval} * * * * *`, {
-      name: `monitor-${monitorId}`,
-      protect: true // 防止任务重叠执行
-    }, async () => {
-      try {
-        await executeMonitorCheck(monitorId);
-      } catch (error) {
-        console.error(`监控检查异常 ${monitorId}:`, error);
-        // 记录监控失败状态
-        await recordMonitorStatus(monitorId, MONITOR_STATUS.DOWN, '监控任务执行异常', null, monitorData.lastStatus || null);
-      }
-    });
+    let job;
+    if (monitorData.interval <= 60) {
+      // 如果间隔小于等于60秒，使用秒级cron表达式
+      job = new Cron(`*/${monitorData.interval} * * * * *`, {
+        name: `monitor-${monitorId}`,
+        protect: true // 防止任务重叠执行
+      }, async () => {
+        try {
+          await executeMonitorCheck(monitorId);
+        } catch (error) {
+          console.error(`监控检查异常 ${monitorId}:`, error);
+          // 记录监控失败状态
+          await recordMonitorStatus(monitorId, MONITOR_STATUS.DOWN, '监控任务执行异常', null, monitorData.lastStatus || null);
+        }
+      });
+    } else if (monitorData.interval <= 3600) {
+      // 如果间隔大于60秒但小于等于3600秒(1小时)，使用分钟级cron表达式
+      const intervalMinutes = Math.ceil(monitorData.interval / 60);
+      job = new Cron(`0 */${intervalMinutes} * * * *`, {
+        name: `monitor-${monitorId}`,
+        protect: true // 防止任务重叠执行
+      }, async () => {
+        try {
+          await executeMonitorCheck(monitorId);
+        } catch (error) {
+          console.error(`监控检查异常 ${monitorId}:`, error);
+          // 记录监控失败状态
+          await recordMonitorStatus(monitorId, MONITOR_STATUS.DOWN, '监控任务执行异常', null, monitorData.lastStatus || null);
+        }
+      });
+    } else {
+      // 如果间隔大于3600秒(1小时)
+      const HOURS_IN_DAY = 24;
+      const totalHours = Math.ceil(monitorData.interval / 3600);
+      // 对小时数取模，确保不超过24小时
+      const intervalHours = totalHours % HOURS_IN_DAY || HOURS_IN_DAY; // 如果能被24整除，则使用24
+      // 生成一个0-59之间的随机数作为分钟数，避免整点负载集中
+      const randomMinute = Math.floor(Math.random() * 60);
+      
+      job = new Cron(`0 ${randomMinute} */${intervalHours} * * *`, {
+        name: `monitor-${monitorId}`,
+        protect: true // 防止任务重叠执行
+      }, async () => {
+        try {
+          await executeMonitorCheck(monitorId);
+        } catch (error) {
+          console.error(`监控检查异常 ${monitorId}:`, error);
+          // 记录监控失败状态
+          await recordMonitorStatus(monitorId, MONITOR_STATUS.DOWN, '监控任务执行异常', null, monitorData.lastStatus || null);
+        }
+      });
+    }
 
     // 存储计划任务实例
     monitorJobs.set(monitorId, job);
