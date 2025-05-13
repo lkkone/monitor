@@ -787,12 +787,12 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
   "monitor": {
     "name": "监控项名称",
     "type": "http",
-    "status": "UP",             // 英文状态: UP, DOWN, PENDING
-    "status_text": "正常",       // 中文状态: 正常, 异常, 等待
+    "status": "正常",             // 中文状态: 正常, 异常, 等待
+    "status_code": 1,            // 数字状态码: 1=正常, 0=异常, 2=等待
     "time": "2093-09-28 16:15:30",
     "message": "监控详细信息"
   },
-  "failure_info": {              // 仅在状态为DOWN时存在
+  "failure_info": {              // 仅在状态为异常时存在
     "count": 5,                  // 失败次数
     "first_failure_time": "2093-09-28 16:00:30",
     "last_failure_time": "2093-09-28 16:15:30",

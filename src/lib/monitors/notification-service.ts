@@ -15,6 +15,7 @@ interface NotificationData {
   monitorType: string;
   status: string; // 状态描述
   statusText: string; // 状态中文描述
+  statusCode: number; // 状态码: 1=正常, 0=异常, 2=等待
   time: string;
   message: string;
   failureCount?: number;
@@ -117,6 +118,7 @@ export async function sendStatusChangeNotifications(
       monitorType: monitor.type,
       status: STATUS_TEXT_CN[status] || '未知', // 使用中文状态描述
       statusText: STATUS_TEXT_CN[status] || '未知',
+      statusCode: status, // 保存原始状态码
       time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
       message: message || '无详细信息'
     };
@@ -369,7 +371,7 @@ async function sendWebhookNotification(
       name: data.monitorName,
       type: data.monitorType,
       status: data.statusText,  // 中文状态描述
-      status_code: data.status, // 英文状态码保留但改名
+      status_code: data.statusCode, // 使用数字状态码
       time: data.time,
       message: data.message
     },
@@ -382,14 +384,35 @@ async function sendWebhookNotification(
     } : null
   };
   
-  // 发送webhook请求
-  await axios.post(url, webhookData, {
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': 'CoolMonitor-Notification-Service'
-    },
-    timeout: 10000
-  });
+  console.log(`发送Webhook通知: URL=${url}, 监控项=${data.monitorName}, 状态=${data.statusText}`);
+  console.log(`Webhook数据: ${JSON.stringify(webhookData)}`);
+  
+  try {
+    // 发送webhook请求
+    const response = await axios.post(url, webhookData, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'CoolMonitor-Notification-Service'
+      },
+      timeout: 10000
+    });
+    
+    console.log(`Webhook通知发送成功: 状态码=${response.status}, 监控项=${data.monitorName}`);
+    return response;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        console.error(`Webhook通知发送失败，服务器响应: 状态码=${error.response.status}, 数据=${JSON.stringify(error.response.data)}, 监控项=${data.monitorName}`);
+      } else if (error.request) {
+        console.error(`Webhook通知发送失败，无响应: ${error.message}, 监控项=${data.monitorName}`);
+      } else {
+        console.error(`Webhook通知发送失败，请求配置错误: ${error.message}, 监控项=${data.monitorName}`);
+      }
+    } else {
+      console.error(`Webhook通知发送失败，未知错误: ${error}, 监控项=${data.monitorName}`);
+    }
+    throw error;
+  }
 }
 
 /**
