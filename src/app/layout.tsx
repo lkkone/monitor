@@ -4,8 +4,7 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import AuthContext from "@/context/AuthContext";
 import { ThemeProvider } from "@/components/theme-provider";
 
-// 导入系统启动脚本，触发自动初始化
-import "@/lib/startup";
+// 系统启动现在通过 instrumentation.ts 自动初始化
 
 export default async function RootLayout({
   children,
