@@ -55,6 +55,13 @@ export interface MonitorPushConfig {
   pushInterval?: number;
 }
 
+export interface MonitorIcmpConfig {
+  hostname: string;
+  packetCount?: number;   // ping包数量，默认4
+  maxPacketLoss?: number; // 最大允许丢包率(%)，默认0
+  maxResponseTime?: number; // 最大允许响应时间(ms)
+}
+
 // 监控检查结果接口
 export interface MonitorCheckResult {
   status: number;

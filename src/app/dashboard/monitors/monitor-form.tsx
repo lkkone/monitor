@@ -127,9 +127,12 @@ export function MonitorForm({ isOpen, onClose, editMode = false, initialData = n
           }
         }
         
-        if (["port", "mysql", "redis"].includes(initialData.type)) {
+        if (["port", "mysql", "redis", "icmp"].includes(initialData.type)) {
           setHostname(initialData.config.hostname as string || "");
-          setPort(String(initialData.config.port || ""));
+          
+          if (["port", "mysql", "redis"].includes(initialData.type)) {
+            setPort(String(initialData.config.port || ""));
+          }
           
           if (["mysql", "redis"].includes(initialData.type)) {
             setUsername(initialData.config.username as string || "");
@@ -207,6 +210,11 @@ export function MonitorForm({ isOpen, onClose, editMode = false, initialData = n
       }
     }
     
+    if (monitorType === "icmp" && !hostname.trim()) {
+      setFormError("主机名不能为空");
+      return;
+    }
+    
     if (monitorType === "keyword" && !keyword.trim()) {
       setFormError("关键字不能为空");
       return;
@@ -215,7 +223,7 @@ export function MonitorForm({ isOpen, onClose, editMode = false, initialData = n
     // 构建监控数据对象
     const config = {
       url: (monitorType === "http" || monitorType === "keyword" || monitorType === "https-cert") ? url : null,
-      hostname: ["port", "mysql", "redis"].includes(monitorType) ? hostname : null,
+      hostname: ["port", "mysql", "redis", "icmp"].includes(monitorType) ? hostname : null,
       port: ["port", "mysql", "redis"].includes(monitorType) ? parseInt(port) : null,
       httpMethod: ["http", "keyword"].includes(monitorType) ? httpMethod : null,
       statusCodes: ["http", "keyword"].includes(monitorType) ? statusCodes : null,
@@ -233,6 +241,10 @@ export function MonitorForm({ isOpen, onClose, editMode = false, initialData = n
       pushToken: monitorType === "push" ? 
         (initialData?.config?.pushToken as string || localStorage.getItem(`push_token_${initialData?.id || 'new'}`) || generatePushToken()) : null,
       pushInterval: monitorType === "push" ? parseInt(interval) : null,
+      // ICMP Ping特定配置
+      packetCount: monitorType === "icmp" ? 4 : null,
+      maxPacketLoss: monitorType === "icmp" ? 0 : null,
+      maxResponseTime: monitorType === "icmp" ? null : null,
     };
     
     // 保存token到localStorage以防止刷新丢失

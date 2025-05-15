@@ -126,27 +126,36 @@ async function testWebhookNotification(name: string, config: WebhookConfig) {
   }
   
   try {
-    // 准备测试数据
-    const testData = {
-      event: 'test',
-      channel: name,
+    console.log(`开始测试Webhook通知: ${name}, URL: ${url}`);
+    
+    // 准备测试数据 - 使用与实际通知一致的格式
+    const webhookData = {
+      event: 'status_change',
       timestamp: new Date().toISOString(),
-      message: '这是一条来自酷监控的测试通知',
       monitor: {
-        name: '测试监控',
-        type: '测试类型',
-        status: 'ok',
-      }
+        name: '测试监控项',
+        type: 'http',
+        status: '正常',  // 中文状态描述
+        status_code: 1,  // 状态码: 1=正常
+        time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+        message: '这是一条来自酷监控的测试通知'
+      },
+      // 添加失败信息结构，与实际通知保持一致
+      failure_info: null
     };
     
+    console.log(`Webhook测试数据: ${JSON.stringify(webhookData)}`);
+    
     // 发送Webhook请求
-    const response = await axios.post(url, testData, {
+    const response = await axios.post(url, webhookData, {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'CoolMonitor-Notification-Service'
       },
       timeout: 10000 // 10秒超时
     });
+    
+    console.log(`Webhook测试响应: 状态码=${response.status}, 数据=${JSON.stringify(response.data)}`);
     
     if (response.status >= 200 && response.status < 300) {
       return NextResponse.json({ success: true, message: `测试Webhook请求已成功发送，响应状态码: ${response.status}` });
@@ -161,10 +170,18 @@ async function testWebhookNotification(name: string, config: WebhookConfig) {
     let errorMessage = '发送Webhook请求失败';
     
     if (axios.isAxiosError(error)) {
-      errorMessage += error.response 
-        ? `: 服务器返回状态码 ${error.response.status}` 
-        : `: ${error.message}`;
+      if (error.response) {
+        console.error(`Webhook请求失败，服务器响应: 状态码=${error.response.status}, 数据=${JSON.stringify(error.response.data)}`);
+        errorMessage += `: 服务器返回状态码 ${error.response.status}`;
+      } else if (error.request) {
+        console.error(`Webhook请求失败，无响应: ${error.message}`);
+        errorMessage += `: 请求发送成功但未收到响应，可能是网络问题或URL无效`;
+      } else {
+        console.error(`Webhook请求失败，请求配置错误: ${error.message}`);
+        errorMessage += `: ${error.message}`;
+      }
     } else if (error instanceof Error) {
+      console.error(`Webhook请求失败，其他错误: ${error.message}`);
       errorMessage += `: ${error.message}`;
     }
     
@@ -191,6 +208,9 @@ async function testWechatNotification(name: string, config: WechatConfig) {
     const title = '酷监控 - 测试通知';
     const content = `## 酷监控通知测试\n\n这是来自酷监控系统的测试通知。\n\n- **通知渠道**: ${name}\n- **测试时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n如果您收到此通知，表示您的微信推送设置已配置成功！`;
     
+    console.log(`开始测试微信推送: ${name}, URL: ${pushUrl}`);
+    console.log(`微信推送测试数据: 标题=${title}, 内容=${content}`);
+    
     // 发送推送请求
     const response = await axios.post(pushUrl, { 
       title, 
@@ -201,6 +221,8 @@ async function testWechatNotification(name: string, config: WechatConfig) {
       },
       timeout: 10000 // 10秒超时
     });
+    
+    console.log(`微信推送测试响应: 状态码=${response.status}, 数据=${JSON.stringify(response.data)}`);
     
     if (response.status >= 200 && response.status < 300) {
       return NextResponse.json({ success: true, message: '测试微信推送已成功发送' });
@@ -215,10 +237,18 @@ async function testWechatNotification(name: string, config: WechatConfig) {
     let errorMessage = '发送微信推送请求失败';
     
     if (axios.isAxiosError(error)) {
-      errorMessage += error.response 
-        ? `: 服务器返回状态码 ${error.response.status}` 
-        : `: ${error.message}`;
+      if (error.response) {
+        console.error(`微信推送请求失败，服务器响应: 状态码=${error.response.status}, 数据=${JSON.stringify(error.response.data)}`);
+        errorMessage += `: 服务器返回状态码 ${error.response.status}`;
+      } else if (error.request) {
+        console.error(`微信推送请求失败，无响应: ${error.message}`);
+        errorMessage += `: 请求发送成功但未收到响应，可能是网络问题或URL无效`;
+      } else {
+        console.error(`微信推送请求失败，请求配置错误: ${error.message}`);
+        errorMessage += `: ${error.message}`;
+      }
     } else if (error instanceof Error) {
+      console.error(`微信推送请求失败，其他错误: ${error.message}`);
       errorMessage += `: ${error.message}`;
     }
     

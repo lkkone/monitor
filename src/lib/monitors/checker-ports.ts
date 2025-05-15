@@ -1,105 +1,77 @@
-import { MonitorPortConfig, MonitorCheckResult, MONITOR_STATUS, ERROR_MESSAGES } from './types';
-import { getNetworkErrorMessage } from './utils';
 import net from 'net';
+import { MonitorPortConfig, MonitorCheckResult, MONITOR_STATUS, ERROR_MESSAGES } from './types';
 
-// 端口监控检查
+/**
+ * 检查TCP端口是否开放
+ * @param config 端口监控配置
+ * @returns 检查结果
+ */
 export async function checkPort(config: MonitorPortConfig): Promise<MonitorCheckResult> {
-  // 兼容性处理：确保配置存在且至少包含必要字段
-  if (!config || typeof config !== 'object') {
-    return {
-      status: MONITOR_STATUS.DOWN,
-      message: '配置无效: 缺少必要的配置信息',
-      ping: null
-    };
-  }
-
-  const { hostname, port } = config;
-  
-  // 验证必要的参数
-  if (!hostname) {
-    return {
-      status: MONITOR_STATUS.DOWN,
-      message: '配置无效: 缺少主机名',
-      ping: null
-    };
-  }
-
-  if (port === undefined || port === null) {
-    return {
-      status: MONITOR_STATUS.DOWN,
-      message: '配置无效: 缺少端口号',
-      ping: null
-    };
-  }
-
   const startTime = Date.now();
+  const { hostname, port } = config;
   const portNumber = typeof port === 'string' ? parseInt(port) : port;
-  
-  // 验证端口号
-  if (isNaN(portNumber) || portNumber <= 0 || portNumber > 65535) {
-    return {
-      status: MONITOR_STATUS.DOWN,
-      message: `配置无效: 端口号 ${port} 不是有效的端口值`,
-      ping: null
-    };
-  }
-  
-  return new Promise<MonitorCheckResult>((resolve) => {
-    const socket = new net.Socket();
-    let isResolved = false;
-    
-    // 设置10秒超时
-    socket.setTimeout(10000);
-    
-    socket.on('connect', () => {
-      const responseTime = Date.now() - startTime;
-      socket.destroy();
-      if (!isResolved) {
-        isResolved = true;
+
+  return new Promise((resolve) => {
+    try {
+      const socket = new net.Socket();
+      let resolved = false;
+
+      // 设置超时
+      socket.setTimeout(10000);
+
+      socket.on('connect', () => {
+        if (resolved) return;
+        resolved = true;
+        socket.destroy();
         resolve({
           status: MONITOR_STATUS.UP,
-          message: `端口 ${portNumber} 开放`,
-          ping: responseTime
+          message: `端口开放`,
+          ping: Date.now() - startTime
         });
-      }
-    });
-    
-    socket.on('timeout', () => {
-      socket.destroy();
-      if (!isResolved) {
-        isResolved = true;
+      });
+
+      socket.on('timeout', () => {
+        if (resolved) return;
+        resolved = true;
+        socket.destroy();
         resolve({
           status: MONITOR_STATUS.DOWN,
           message: ERROR_MESSAGES.TIMEOUT,
           ping: Date.now() - startTime
         });
-      }
-    });
-    
-    socket.on('error', (error) => {
-      socket.destroy();
-      if (!isResolved) {
-        isResolved = true;
+      });
+
+      socket.on('error', (error: NodeJS.ErrnoException) => {
+        if (resolved) return;
+        resolved = true;
+        socket.destroy();
+
+        let message = ERROR_MESSAGES.UNKNOWN_ERROR;
+        if (error.code === 'ECONNREFUSED') {
+          message = ERROR_MESSAGES.CONNECTION_REFUSED;
+        } else if (error.code === 'ETIMEDOUT') {
+          message = ERROR_MESSAGES.TIMEOUT;
+        } else if (error.code === 'ENOTFOUND') {
+          message = ERROR_MESSAGES.HOST_NOT_FOUND;
+        } else {
+          message = `${ERROR_MESSAGES.NETWORK_ERROR}: ${error.message}`;
+        }
+
         resolve({
           status: MONITOR_STATUS.DOWN,
-          message: getNetworkErrorMessage(error),
+          message,
           ping: Date.now() - startTime
         });
-      }
-    });
-    
-    // 尝试连接
-    try {
+      });
+
+      // 开始连接
       socket.connect(portNumber, hostname);
     } catch (error) {
-      if (!isResolved) {
-        isResolved = true;
-        resolve({
-          status: MONITOR_STATUS.DOWN,
-          message: getNetworkErrorMessage(error),
-          ping: Date.now() - startTime
-        });
-      }
+      resolve({
+        status: MONITOR_STATUS.DOWN,
+        message: `${ERROR_MESSAGES.UNKNOWN_ERROR}: ${error instanceof Error ? error.message : String(error)}`,
+        ping: null
+      });
     }
   });
 } 

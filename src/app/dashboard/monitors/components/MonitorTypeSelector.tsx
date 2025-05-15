@@ -20,6 +20,7 @@ export function MonitorTypeSelector({ value, onChange }: MonitorTypeSelectorProp
           <option value="https-cert">HTTPS证书</option>
           <option value="port">TCP Port</option>
           <option value="keyword">HTTP/HTTPS - 关键字</option>
+          <option value="icmp">ICMP Ping</option>
         </optgroup>
         <optgroup label="被动监控类型">
           <option value="push">Push</option>

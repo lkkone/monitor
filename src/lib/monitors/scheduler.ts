@@ -1,7 +1,7 @@
 import { Cron } from 'croner';
 import { prisma } from '../prisma';
 import { checkers } from './index';
-import { MONITOR_STATUS, MonitorHttpConfig, MonitorKeywordConfig, MonitorPortConfig, MonitorDatabaseConfig, MonitorPushConfig } from './types';
+import { MONITOR_STATUS, MonitorHttpConfig, MonitorKeywordConfig, MonitorPortConfig, MonitorDatabaseConfig, MonitorPushConfig, MonitorIcmpConfig } from './types';
 import crypto from 'crypto';
 import { sendStatusChangeNotifications } from './notification-service';
 
@@ -297,6 +297,12 @@ async function executeMonitorCheck(monitorId: string) {
         status = dbResult.status;
         message = dbResult.message;
         ping = dbResult.ping;
+        break;
+      case 'icmp':
+        const icmpResult = await checkers.icmp(monitorData.config as unknown as MonitorIcmpConfig);
+        status = icmpResult.status;
+        message = icmpResult.message;
+        ping = icmpResult.ping;
         break;
       default:
         message = `不支持的监控类型: ${monitorData.type}`;

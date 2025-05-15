@@ -2,6 +2,7 @@ import { checkHttp, checkKeyword, checkHttpsCertificate } from './checker-http';
 import { checkPort } from './checker-ports';
 import { checkDatabase } from './checker-database';
 import { checkPush } from './checker-push';
+import { checkIcmp } from './checker-icmp';
 import { MONITOR_STATUS, ERROR_MESSAGES } from './types';
 import { scheduleMonitor, stopMonitor, resetAllMonitors } from './scheduler';
 
@@ -16,7 +17,8 @@ export const checkers = {
   "https-cert": checkHttpsCertificate,
   port: checkPort,
   database: checkDatabase,
-  push: checkPush
+  push: checkPush,
+  icmp: checkIcmp
 };
 
 // 导出调度器

@@ -168,6 +168,24 @@ export function BasicInfoSection({
         </>
       )}
 
+      {/* ICMP Ping 主机名 */}
+      {monitorType === "icmp" && (
+        <div className="space-y-2 mt-6">
+          <label className="block text-foreground/80 font-medium">主机名/IP地址 *</label>
+          <input
+            type="text"
+            value={hostname}
+            onChange={(e) => setHostname(e.target.value)}
+            placeholder="例如：google.com 或 192.168.1.1"
+            className="w-full px-4 py-2 rounded-lg dark:bg-dark-input bg-light-input border border-primary/20 focus:border-primary focus:outline-none"
+            required
+          />
+          <p className="text-xs text-foreground/50">
+            输入要ping的主机名或IP地址
+          </p>
+        </div>
+      )}
+
       {/* Push URL */}
       {monitorType === "push" && (
         <div className="space-y-3 mt-6">

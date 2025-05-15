@@ -61,24 +61,23 @@ export function AdvancedOptionsSection({
                 <option value="DELETE">DELETE</option>
                 <option value="HEAD">HEAD</option>
                 <option value="OPTIONS">OPTIONS</option>
+                <option value="PATCH">PATCH</option>
               </select>
             </div>
             
             {/* 有效状态码 */}
             <div className="space-y-2">
               <label className="block text-foreground/80 font-medium">有效状态码</label>
-              <select
+              <input
+                type="text"
                 value={statusCodes}
                 onChange={(e) => setStatusCodes(e.target.value)}
+                placeholder="例如：200 或 200-299"
                 className="w-full px-4 py-2 rounded-lg dark:bg-dark-input bg-light-input border border-primary/20 focus:border-primary focus:outline-none"
-              >
-                <option value="200-299">200-299</option>
-                <option value="200">200</option>
-                <option value="200,201,204">200,201,204</option>
-                <option value="400-499">400-499</option>
-                <option value="500-599">500-599</option>
-              </select>
-              <p className="text-xs text-foreground/50">被视为成功的状态码</p>
+              />
+              <p className="text-xs text-foreground/50">
+                可以是单个状态码（如200）或范围（如200-299）
+              </p>
             </div>
           </div>
           
@@ -132,6 +131,65 @@ export function AdvancedOptionsSection({
           <p className="text-sm text-foreground/70 mb-4">
             HTTPS证书监控会定期检查HTTPS证书的有效性，并在证书失效前发出警告。
           </p>
+        </div>
+      )}
+      
+      {/* ICMP Ping选项 */}
+      {monitorType === "icmp" && (
+        <div className="p-5 border border-primary/10 rounded-lg">
+          <h3 className="text-lg font-medium mb-4 text-primary">ICMP Ping 选项</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Ping包数量 */}
+            <div className="space-y-2">
+              <label className="block text-foreground/80 font-medium">Ping包数量</label>
+              <select
+                className="w-full px-4 py-2 rounded-lg dark:bg-dark-input bg-light-input border border-primary/20 focus:border-primary focus:outline-none"
+                defaultValue="4"
+              >
+                <option value="2">2</option>
+                <option value="4">4</option>
+                <option value="8">8</option>
+                <option value="16">16</option>
+              </select>
+              <p className="text-xs text-foreground/50">
+                每次检查发送的Ping包数量
+              </p>
+            </div>
+            
+            {/* 最大允许丢包率 */}
+            <div className="space-y-2">
+              <label className="block text-foreground/80 font-medium">最大允许丢包率 (%)</label>
+              <select
+                className="w-full px-4 py-2 rounded-lg dark:bg-dark-input bg-light-input border border-primary/20 focus:border-primary focus:outline-none"
+                defaultValue="0"
+              >
+                <option value="0">0% (不允许丢包)</option>
+                <option value="25">25%</option>
+                <option value="50">50%</option>
+                <option value="75">75%</option>
+              </select>
+              <p className="text-xs text-foreground/50">
+                超过此丢包率将被视为故障
+              </p>
+            </div>
+          </div>
+          
+          <div className="mt-6">
+            {/* 最大响应时间 */}
+            <div className="space-y-2">
+              <label className="block text-foreground/80 font-medium">最大响应时间 (ms)</label>
+              <input
+                type="number"
+                placeholder="例如：500 (留空表示不限制)"
+                className="w-full px-4 py-2 rounded-lg dark:bg-dark-input bg-light-input border border-primary/20 focus:border-primary focus:outline-none"
+                min="1"
+              />
+              <p className="text-xs text-foreground/50">
+                超过此响应时间将被视为故障 (留空表示不限制)
+              </p>
+            </div>
+          </div>
         </div>
       )}
       

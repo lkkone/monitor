@@ -6,6 +6,7 @@ import { checkHttp, checkKeyword, checkHttpsCertificate } from '@/lib/monitors/c
 import { checkPort } from '@/lib/monitors/checker-ports';
 import { checkDatabase } from '@/lib/monitors/checker-database';
 import { checkPush } from '@/lib/monitors/checker-push';
+import { checkIcmp } from '@/lib/monitors/checker-icmp';
 import { MonitorDatabaseConfig } from '@/lib/monitors/types';
 
 // POST /api/monitors - 创建新监控项
@@ -56,6 +57,13 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
+    }
+    
+    if (data.type === 'icmp' && !data.config?.hostname) {
+      return NextResponse.json(
+        { error: '主机名/IP为必填项' },
+        { status: 400 }
+      );
     }
     
     // 提取监控设置
@@ -204,6 +212,8 @@ export function getCheckerForType(type: string) {
       return (config: MonitorDatabaseConfig) => checkDatabase('redis', config);
     case 'push':
       return checkPush;
+    case 'icmp':
+      return checkIcmp;
     default:
       throw new Error(`不支持的监控类型: ${type}`);
   }

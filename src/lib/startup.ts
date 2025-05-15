@@ -49,5 +49,6 @@ export async function forceInitSystem() {
   }
 }
 
+
 // 导出标记，表示此模块已加载
 export const SYSTEM_INITIALIZED = true; 
