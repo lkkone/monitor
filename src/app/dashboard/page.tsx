@@ -18,6 +18,7 @@ interface MonitorItemData {
   active: boolean;
   lastStatus?: number;
   lastCheckAt?: string;
+  config?: Record<string, unknown>;
 }
 
 // 监控项状态映射
@@ -75,9 +76,35 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
     fetchMonitors();
   }, [activeMonitorId]);
   
-  const filteredItems = monitors.filter(item => 
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredItems = monitors.filter(item => {
+    // 名称匹配
+    if (item.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return true;
+    }
+    
+    // 尝试匹配配置中的URL、hostname或IP地址
+    if (item.config) {
+      const config = item.config as Record<string, unknown>;
+      
+      // 匹配URL
+      if (config.url && String(config.url).toLowerCase().includes(searchQuery.toLowerCase())) {
+        return true;
+      }
+      
+      // 匹配hostname
+      if (config.hostname && String(config.hostname).toLowerCase().includes(searchQuery.toLowerCase())) {
+        return true;
+      }
+      
+      // 匹配IP:端口组合
+      if (config.hostname && config.port && 
+          `${String(config.hostname)}:${String(config.port)}`.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return true;
+      }
+    }
+    
+    return false;
+  });
 
   const getIconForType = (type: string) => {
     switch(type) {

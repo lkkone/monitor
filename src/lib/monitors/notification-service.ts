@@ -123,6 +123,26 @@ export async function sendStatusChangeNotifications(
       message: message || '无详细信息'
     };
 
+    // 添加监控地址信息
+    if (monitor.config) {
+      try {
+        const monitorConfig = monitor.config as Record<string, unknown>;
+        // 添加URL（针对http、https-cert、keyword类型）
+        if (monitorConfig.url) {
+          notificationData.message = `监控地址: ${String(monitorConfig.url)}\n${notificationData.message}`;
+        }
+        // 添加主机和端口信息（针对port、mysql、redis等类型）
+        else if (monitorConfig.hostname) {
+          const address = monitorConfig.port
+            ? `${String(monitorConfig.hostname)}:${String(monitorConfig.port)}`
+            : String(monitorConfig.hostname);
+          notificationData.message = `监控地址: ${address}\n${notificationData.message}`;
+        }
+      } catch (error) {
+        console.error("处理监控配置信息出错:", error);
+      }
+    }
+
     // 计算时间窗口（默认30分钟）
     const timeWindow = monitor.type === 'push' 
       ? (monitor.config as Record<string, number>).pushInterval || 60 // pushInterval 是秒
@@ -178,7 +198,7 @@ export async function sendStatusChangeNotifications(
         firstFailureTime: firstFailure?.timestamp.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) || '未知',
         lastFailureTime: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
         failureDuration: duration,
-        message: `在 ${Math.floor(timeWindow / 60)} 分钟内失败 ${recentFailures} 次，首次失败于 ${firstFailure?.timestamp.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) || '未知'}，持续 ${duration} 分钟\n${message}`
+        message: `在 ${Math.floor(timeWindow / 60)} 分钟内失败 ${recentFailures} 次，首次失败于 ${firstFailure?.timestamp.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) || '未知'}，持续 ${duration} 分钟\n${notificationData.message}`
       };
 
       // 发送聚合通知
@@ -207,7 +227,7 @@ export async function sendStatusChangeNotifications(
       // 增强恢复通知内容
       const recoveryData = {
         ...notificationData,
-        message: `监控已恢复正常。${recoverDuration > 0 ? `故障持续了约 ${recoverDuration} 分钟。` : ''}\n${message}`
+        message: `监控已恢复正常。${recoverDuration > 0 ? `故障持续了约 ${recoverDuration} 分钟。` : ''}\n${notificationData.message}`
       };
       
       // 发送恢复通知
@@ -373,7 +393,8 @@ async function sendWebhookNotification(
       status: data.statusText,  // 中文状态描述
       status_code: data.statusCode, // 使用数字状态码
       time: data.time,
-      message: data.message
+      message: data.message,
+      address: null as string | null // 初始化地址字段为null
     },
     // 额外字段用于失败状态
     failure_info: data.failureCount ? {
@@ -383,6 +404,12 @@ async function sendWebhookNotification(
       duration_minutes: data.failureDuration
     } : null
   };
+  
+  // 从消息中提取监控地址信息并添加到webhook数据中
+  const addressMatch = data.message.match(/监控地址: (.*?)(?:\n|$)/);
+  if (addressMatch && addressMatch[1]) {
+    webhookData.monitor.address = addressMatch[1];
+  }
   
   console.log(`发送Webhook通知: URL=${url}, 监控项=${data.monitorName}, 状态=${data.statusText}`);
   console.log(`Webhook数据: ${JSON.stringify(webhookData)}`);
