@@ -171,6 +171,66 @@ describe('HTTP监控检查器测试', () => {
       expect(result.status).toBe(MONITOR_STATUS.DOWN);
       expect(result.message).toContain('未找到关键词');
     });
+
+    it('应当支持多个关键词，匹配到任意一个即为成功', async () => {
+      // Mock Response对象
+      const mockResponse = {
+        status: 200,
+        text: vi.fn().mockResolvedValue('Welcome to Example.com website')
+      };
+      
+      // Mock fetch函数
+      mockedStandardFetch.mockResolvedValue(mockResponse);
+      
+      const result = await checkKeyword({ 
+        url: 'https://example.com', 
+        keyword: 'NotFound,Example,AnotherKeyword' 
+      });
+      
+      expect(result.status).toBe(MONITOR_STATUS.UP);
+      expect(result.message).toContain('找到关键词');
+      expect(result.message).toContain('匹配到: Example');
+    });
+
+    it('应当在多个关键词都未找到时返回DOWN状态', async () => {
+      // Mock Response对象
+      const mockResponse = {
+        status: 200,
+        text: vi.fn().mockResolvedValue('Welcome to Test.com website')
+      };
+      
+      // Mock fetch函数
+      mockedStandardFetch.mockResolvedValue(mockResponse);
+      
+      const result = await checkKeyword({ 
+        url: 'https://example.com', 
+        keyword: 'NotFound,Example,AnotherKeyword' 
+      });
+      
+      expect(result.status).toBe(MONITOR_STATUS.DOWN);
+      expect(result.message).toContain('未找到关键词');
+      expect(result.message).toContain('检查了 3 个关键词');
+    });
+
+    it('应当正确处理关键词中的空格和空关键词', async () => {
+      // Mock Response对象
+      const mockResponse = {
+        status: 200,
+        text: vi.fn().mockResolvedValue('Welcome to Example.com website')
+      };
+      
+      // Mock fetch函数
+      mockedStandardFetch.mockResolvedValue(mockResponse);
+      
+      const result = await checkKeyword({ 
+        url: 'https://example.com', 
+        keyword: ' , Example , , AnotherKeyword , ' // 包含空格和空关键词
+      });
+      
+      expect(result.status).toBe(MONITOR_STATUS.UP);
+      expect(result.message).toContain('找到关键词');
+      expect(result.message).toContain('匹配到: Example');
+    });
   });
 
   describe('checkHttpsCertificate', () => {

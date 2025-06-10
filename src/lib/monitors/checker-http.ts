@@ -341,18 +341,32 @@ export async function checkKeyword(config: MonitorKeywordConfig): Promise<Monito
     
     // 检查响应内容中是否包含关键词
     const responseText = await response.text();
-    const keywordFound = responseText.includes(keyword);
+    
+    // 支持多个关键词，用英文逗号分隔，每个关键词之间是"或"的关系
+    const keywords = keyword.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    let keywordFound = false;
+    let foundKeyword = '';
+    
+    for (const kw of keywords) {
+      if (responseText.includes(kw)) {
+        keywordFound = true;
+        foundKeyword = kw;
+        break;
+      }
+    }
     
     if (keywordFound) {
+      const keywordInfo = keywords.length > 1 ? ` (匹配到: ${foundKeyword})` : '';
       return {
         status: MONITOR_STATUS.UP,
-        message: `找到关键词，状态码: ${response.status}${proxyEnabled ? ' (使用代理)' : ''}`,
+        message: `找到关键词${keywordInfo}，状态码: ${response.status}${proxyEnabled ? ' (使用代理)' : ''}`,
         ping: responseTime
       };
     } else {
+      const keywordInfo = keywords.length > 1 ? ` (检查了 ${keywords.length} 个关键词)` : '';
       return {
         status: MONITOR_STATUS.DOWN,
-        message: ERROR_MESSAGES.KEYWORD_NOT_FOUND,
+        message: `${ERROR_MESSAGES.KEYWORD_NOT_FOUND}${keywordInfo}`,
         ping: responseTime
       };
     }

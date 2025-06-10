@@ -128,12 +128,12 @@ export function BasicInfoSection({
             type="text"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            placeholder="需要在响应中查找的文本"
+            placeholder="需要在响应中查找的文本，支持多个关键字用英文逗号分隔"
             className="w-full px-4 py-2 rounded-lg dark:bg-dark-input bg-light-input border border-primary/20 focus:border-primary focus:outline-none"
             required
           />
           <p className="text-xs text-foreground/50">
-            如果响应中不包含此关键字，则监控会被标记为故障
+            支持多个关键字，用英文逗号分隔（如：error,错误,failed），只要匹配到其中任意一个即为成功
           </p>
         </div>
       )}
