@@ -61,6 +61,8 @@ export async function sendStatusChangeNotifications(
   message: string,
   prevStatus: number | null
 ) {
+  console.log(`[通知系统] 接收到状态变更 - 监控ID: ${monitorId}, 新状态: ${status}, 上次状态: ${prevStatus}, 消息: ${message}`);
+  
   try {
     // 获取监控项详情
     const monitor = await prisma.monitor.findUnique({
@@ -86,31 +88,46 @@ export async function sendStatusChangeNotifications(
 
     // 如果没有启用的通知配置，则不发送
     if (!monitor.notificationBindings || monitor.notificationBindings.length === 0) {
+      console.log(`[通知系统] 监控 ${monitorId} 没有启用的通知配置，跳过发送`);
       return;
     }
+
+    console.log(`[通知系统] 监控 ${monitorId} 有 ${monitor.notificationBindings.length} 个通知配置`);
 
     // 检查是否为新添加的监控项（状态历史记录数量小于等于1）
     const isNewMonitor = !monitor.statusHistory || monitor.statusHistory.length <= 1;
 
-    // 检查实际的状态变化
+    console.log(`[通知系统] 监控 ${monitorId} - 是否新监控: ${isNewMonitor}, 历史记录数量: ${monitor.statusHistory?.length || 0}`);
+
+    // 使用调度器传入的prevStatus，这是最准确的状态变化信息
     let realPrevStatus = prevStatus;
-    if (!isNewMonitor && monitor.statusHistory && monitor.statusHistory.length > 1) {
-      // 排除当前状态，检查上一个状态
+    
+    // 只有当prevStatus为null且有历史记录时，才从历史记录中获取上一个状态
+    // 这种情况通常发生在系统重启后第一次检查
+    if (prevStatus === null && !isNewMonitor && monitor.statusHistory && monitor.statusHistory.length > 1) {
       const prevStatusFromHistory = monitor.statusHistory[1]?.status;
       if (prevStatusFromHistory !== undefined && prevStatusFromHistory !== null) {
         realPrevStatus = prevStatusFromHistory;
       }
     }
 
+    console.log(`[通知系统] 监控 ${monitorId} - 原始上次状态: ${prevStatus}, 实际上次状态: ${realPrevStatus}, 当前状态: ${status}`);
+
     // 如果状态没有变化，则不发送通知
-    if (realPrevStatus !== null && realPrevStatus === status) {
+    // 注意：当prevStatus为null时，表示这是一个状态变化（从未知状态到当前状态），应该发送通知
+    if (prevStatus !== null && realPrevStatus === status) {
+      console.log(`[通知系统] 监控 ${monitorId} 状态没有变化 (${realPrevStatus} -> ${status})，跳过发送`);
       return;
     }
 
     // 如果是新监控项，且状态为正常，则不发送通知
     if (isNewMonitor && status === 1) {
+      console.log(`[通知系统] 监控 ${monitorId} 是新监控且状态正常，跳过发送`);
       return;
     }
+
+    console.log(`[通知系统] 监控 ${monitorId} 通过基本检查，继续处理通知逻辑`);
+    console.log(`[通知系统] 监控 ${monitorId} - resendInterval 设置: ${monitor.resendInterval}`);
 
     // 准备基础通知数据
     const notificationData: NotificationData = {
@@ -143,42 +160,76 @@ export async function sendStatusChangeNotifications(
       }
     }
 
-    // 计算时间窗口（默认30分钟）
-    const timeWindow = monitor.type === 'push' 
-      ? (monitor.config as Record<string, number>).pushInterval || 60 // pushInterval 是秒
-      : monitor.resendInterval * 60 || 30 * 60; // 转换为秒
-
     // 检查上次通知时间和状态
     const lastNotification = notificationCache.get(monitorId);
     const now = Date.now();
 
     // 如果是失败状态
     if (status === 0) {
-      // 如果上次通知在时间窗口内且状态也是失败，则不发送重复通知
-      if (lastNotification && 
-          (now - lastNotification.time) / 1000 < timeWindow && 
-          lastNotification.status === 0) {
-        return;
+      // 如果设置了重复通知间隔（按失败次数），需要检查是否达到重复通知条件
+      if (monitor.resendInterval > 0) {
+        // 如果上次通知状态也是失败状态，需要检查是否达到重复通知的条件
+        if (lastNotification && lastNotification.status === 0) {
+          // 获取自上次通知之后的连续失败次数（不包含上次通知时的那次失败）
+          const failuresSinceLastNotification = await prisma.monitorStatus.count({
+            where: {
+              monitorId,
+              status: 0,
+              timestamp: {
+                gt: new Date(lastNotification.time) // 使用 gt 而不是 gte，排除上次通知的时间点
+              }
+            }
+          });
+
+          console.log(`监控 ${monitorId} - 自上次通知以来的失败次数: ${failuresSinceLastNotification}, 需要达到: ${monitor.resendInterval}`);
+
+          // 如果失败次数未达到重复通知间隔，则不发送通知
+          if (failuresSinceLastNotification < monitor.resendInterval) {
+            console.log(`监控 ${monitorId} - 失败次数未达到重复通知间隔，跳过通知`);
+            return;
+          }
+          
+          console.log(`监控 ${monitorId} - 达到重复通知条件，准备发送通知`);
+        }
+      } else {
+        // 如果未设置重复通知间隔（为0），且上次通知状态也是失败，则不发送重复通知
+        if (lastNotification && lastNotification.status === 0) {
+          console.log(`监控 ${monitorId} - 未设置重复通知间隔且上次为失败状态，跳过通知`);
+          return;
+        }
       }
 
-      // 获取时间窗口内的失败记录
-      const recentFailures = await prisma.monitorStatus.count({
+      // 查找最近一次成功状态的时间，以确定连续失败的起始点
+      const lastSuccess = await prisma.monitorStatus.findFirst({
+        where: {
+          monitorId,
+          status: 1
+        },
+        orderBy: {
+          timestamp: 'desc'
+        }
+      });
+
+      const continuousFailureStartTime = lastSuccess?.timestamp || new Date(0);
+
+      // 获取连续失败的总次数
+      const totalFailures = await prisma.monitorStatus.count({
         where: {
           monitorId,
           status: 0,
           timestamp: {
-            gte: new Date(now - timeWindow * 1000)
+            gt: continuousFailureStartTime
           }
         }
       });
-      
-      // 获取首次失败时间
-      const firstFailure = await prisma.monitorStatus.findFirst({
+
+      // 获取第一次连续失败的时间
+      const firstContinuousFailure = await prisma.monitorStatus.findFirst({
         where: {
           monitorId,
           status: 0,
           timestamp: {
-            gte: new Date(now - timeWindow * 1000)
+            gt: continuousFailureStartTime
           }
         },
         orderBy: {
@@ -187,18 +238,18 @@ export async function sendStatusChangeNotifications(
       });
 
       // 计算失败持续时间
-      const duration = firstFailure 
-        ? Math.floor((now - firstFailure.timestamp.getTime()) / 1000 / 60) 
+      const duration = firstContinuousFailure 
+        ? Math.floor((now - firstContinuousFailure.timestamp.getTime()) / 1000 / 60) 
         : 0;
 
       // 扩展通知数据
       const aggregatedData = {
         ...notificationData,
-        failureCount: recentFailures,
-        firstFailureTime: firstFailure?.timestamp.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) || '未知',
+        failureCount: totalFailures,
+        firstFailureTime: firstContinuousFailure?.timestamp.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) || '未知',
         lastFailureTime: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
         failureDuration: duration,
-        message: `在 ${Math.floor(timeWindow / 60)} 分钟内失败 ${recentFailures} 次，首次失败于 ${firstFailure?.timestamp.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) || '未知'}，持续 ${duration} 分钟\n${notificationData.message}`
+        message: `连续失败 ${totalFailures} 次，首次失败于 ${firstContinuousFailure?.timestamp.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) || '未知'}，持续 ${duration} 分钟\n${notificationData.message}`
       };
 
       // 发送聚合通知

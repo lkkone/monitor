@@ -367,6 +367,8 @@ async function recordMonitorStatus(
   ping: number | null,
   prevStatus: number | null
 ) {
+  console.log(`记录监控状态 - ID: ${monitorId}, 状态: ${status}, 上次状态: ${prevStatus}, 消息: ${message}`);
+  
   const timestamp = new Date();
   
   await prisma.$executeRaw`
@@ -376,7 +378,9 @@ async function recordMonitorStatus(
 
   // 触发状态变更通知
   try {
+    console.log(`准备发送状态变更通知 - ID: ${monitorId}, 状态: ${status}, 上次状态: ${prevStatus}`);
     await sendStatusChangeNotifications(monitorId, status, message, prevStatus);
+    console.log(`状态变更通知发送完成 - ID: ${monitorId}`);
   } catch (error) {
     console.error(`发送监控 ${monitorId} 状态变更通知失败:`, error);
     // 通知发送失败不影响监控状态记录
