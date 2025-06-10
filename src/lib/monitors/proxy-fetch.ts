@@ -101,19 +101,28 @@ export async function proxyFetch(
   const dispatcher = new ProxyAgent(proxyAgentConfig);
   
   try {
-    // 创建信号控制器并设置超时
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    // 使用传入的signal或创建默认的10秒超时信号
+    let effectiveSignal = options?.signal;
+    let timeoutId: NodeJS.Timeout | undefined;
+    
+    if (!effectiveSignal) {
+      // 如果没有传入signal，创建默认的10秒超时
+      const controller = new AbortController();
+      timeoutId = setTimeout(() => controller.abort(), 10000);
+      effectiveSignal = controller.signal;
+    }
     
     // 构建请求选项
     const fetchOptions: ExtendedRequestOptions = {
       ...(options || {}),
       dispatcher,
-      signal: controller.signal
+      signal: effectiveSignal
     };
     
     const response = await undiciFetch(url, fetchOptions as any);
-    clearTimeout(timeoutId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
     
     return response as unknown as globalThis.Response;
   } catch (error) {
@@ -134,14 +143,21 @@ export async function standardFetch(
   ignoreTls = false
 ): Promise<globalThis.Response> {
   try {
-    // 创建信号控制器并设置超时
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    // 使用传入的signal或创建默认的10秒超时信号
+    let effectiveSignal = options?.signal;
+    let timeoutId: NodeJS.Timeout | undefined;
+    
+    if (!effectiveSignal) {
+      // 如果没有传入signal，创建默认的10秒超时
+      const controller = new AbortController();
+      timeoutId = setTimeout(() => controller.abort(), 10000);
+      effectiveSignal = controller.signal;
+    }
     
     // 构建请求选项
     const fetchOptions: ExtendedRequestOptions = {
       ...(options || {}),
-      signal: controller.signal
+      signal: effectiveSignal
     };
     
     // 如果设置忽略证书错误
@@ -159,7 +175,9 @@ export async function standardFetch(
     }
     
     const response = await undiciFetch(url, fetchOptions as any);
-    clearTimeout(timeoutId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
     
     return response as unknown as globalThis.Response;
   } catch (error) {

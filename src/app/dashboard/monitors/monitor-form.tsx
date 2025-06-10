@@ -65,6 +65,7 @@ export function MonitorForm({ isOpen, onClose, editMode = false, initialData = n
   const [requestBody, setRequestBody] = useState("");
   const [requestHeaders, setRequestHeaders] = useState("");
   const [maxRedirects, setMaxRedirects] = useState("10");
+  const [connectTimeout, setConnectTimeout] = useState("10");
   
   // 验证
   const [keyword, setKeyword] = useState("");
@@ -114,6 +115,7 @@ export function MonitorForm({ isOpen, onClose, editMode = false, initialData = n
           setHttpMethod(initialData.config.httpMethod as string || "GET");
           setStatusCodes(initialData.config.statusCodes as string || "200-299");
           setMaxRedirects(String(initialData.config.maxRedirects || "10"));
+          setConnectTimeout(String(initialData.config.connectTimeout || "10"));
           setRequestBody(initialData.config.requestBody as string || "");
           setRequestHeaders(initialData.config.requestHeaders as string || "");
           
@@ -225,9 +227,10 @@ export function MonitorForm({ isOpen, onClose, editMode = false, initialData = n
       url: (monitorType === "http" || monitorType === "keyword" || monitorType === "https-cert") ? url : null,
       hostname: ["port", "mysql", "redis", "icmp"].includes(monitorType) ? hostname : null,
       port: ["port", "mysql", "redis"].includes(monitorType) ? parseInt(port) : null,
-      httpMethod: ["http", "keyword"].includes(monitorType) ? httpMethod : null,
-      statusCodes: ["http", "keyword"].includes(monitorType) ? statusCodes : null,
-      maxRedirects: ["http", "keyword", "https-cert"].includes(monitorType) ? parseInt(maxRedirects) : null,
+              httpMethod: ["http", "keyword"].includes(monitorType) ? httpMethod : null,
+        statusCodes: ["http", "keyword"].includes(monitorType) ? statusCodes : null,
+        maxRedirects: ["http", "keyword", "https-cert"].includes(monitorType) ? parseInt(maxRedirects) : null,
+        connectTimeout: ["http", "keyword", "https-cert"].includes(monitorType) ? parseInt(connectTimeout) : null,
       keyword: monitorType === "keyword" ? keyword : null,
       ignoreTls,
       notifyCertExpiry: monitorType === "http" ? notifyCertExpiry : null,
@@ -449,12 +452,14 @@ export function MonitorForm({ isOpen, onClose, editMode = false, initialData = n
                 setRequestHeaders={setRequestHeaders}
                 ignoreTls={ignoreTls}
                 setIgnoreTls={setIgnoreTls}
-                maxRedirects={maxRedirects}
-                setMaxRedirects={setMaxRedirects}
-                upsideDown={upsideDown}
-                setUpsideDown={setUpsideDown}
-                notifyCertExpiry={notifyCertExpiry}
-                setNotifyCertExpiry={setNotifyCertExpiry}
+                            maxRedirects={maxRedirects}
+            setMaxRedirects={setMaxRedirects}
+            connectTimeout={connectTimeout}
+            setConnectTimeout={setConnectTimeout}
+            upsideDown={upsideDown}
+            setUpsideDown={setUpsideDown}
+            notifyCertExpiry={notifyCertExpiry}
+            setNotifyCertExpiry={setNotifyCertExpiry}
               />
           )}
         </div>

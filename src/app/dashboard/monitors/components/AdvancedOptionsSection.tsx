@@ -14,6 +14,8 @@ interface AdvancedOptionsSectionProps {
   setIgnoreTls: Dispatch<SetStateAction<boolean>>;
   maxRedirects: string;
   setMaxRedirects: Dispatch<SetStateAction<string>>;
+  connectTimeout: string;
+  setConnectTimeout: Dispatch<SetStateAction<string>>;
   upsideDown: boolean;
   setUpsideDown: Dispatch<SetStateAction<boolean>>;
   notifyCertExpiry: boolean;
@@ -34,6 +36,8 @@ export function AdvancedOptionsSection({
   setIgnoreTls,
   maxRedirects,
   setMaxRedirects,
+  connectTimeout,
+  setConnectTimeout,
   upsideDown,
   setUpsideDown,
   notifyCertExpiry,
@@ -46,7 +50,7 @@ export function AdvancedOptionsSection({
         <div className="p-5 border border-primary/10 rounded-lg">
           <h3 className="text-lg font-medium mb-4 text-primary">HTTP/HTTPS 选项</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* 方法 */}
             <div className="space-y-2">
               <label className="block text-foreground/80 font-medium">请求方法</label>
@@ -77,6 +81,23 @@ export function AdvancedOptionsSection({
               />
               <p className="text-xs text-foreground/50">
                 可以是单个状态码（如200）或范围（如200-299）
+              </p>
+            </div>
+            
+            {/* 连接超时 */}
+            <div className="space-y-2">
+              <label className="block text-foreground/80 font-medium">连接超时 (秒)</label>
+              <input
+                type="number"
+                value={connectTimeout}
+                onChange={(e) => setConnectTimeout(e.target.value)}
+                placeholder="10"
+                min="1"
+                max="300"
+                className="w-full px-4 py-2 rounded-lg dark:bg-dark-input bg-light-input border border-primary/20 focus:border-primary focus:outline-none"
+              />
+              <p className="text-xs text-foreground/50">
+                请求超时时间，范围：1-300秒
               </p>
             </div>
           </div>

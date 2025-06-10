@@ -92,6 +92,7 @@ setInterval(() => {
 
 // HTTP监控检查
 export async function checkHttp(config: MonitorHttpConfig): Promise<MonitorCheckResult> {
+  
   // 统一与前端配置项，确保兼容性处理
   const { 
     url, 
@@ -100,6 +101,7 @@ export async function checkHttp(config: MonitorHttpConfig): Promise<MonitorCheck
     maxRedirects = 10, 
     requestBody = '', 
     requestHeaders = '',
+    connectTimeout = 10, // 默认10秒超时
     notifyCertExpiry = false,
     monitorId = '',
     monitorName = ''
@@ -117,12 +119,13 @@ export async function checkHttp(config: MonitorHttpConfig): Promise<MonitorCheck
   const startTime = Date.now();
   
   try {
-    // 如果启用了证书通知且是HTTPS URL，先检查证书状态
-    if (notifyCertExpiry && url.startsWith('https://')) {
+          // 如果启用了证书通知且是HTTPS URL，先检查证书状态
+      if (notifyCertExpiry && url.startsWith('https://')) {
       try {
         // 复用HTTPS证书检查逻辑进行证书检查
         const certResult = await checkHttpsCertificate({ 
           url, 
+          connectTimeout, // 传递用户配置的超时时间
           monitorId, 
           monitorName 
         });
@@ -148,7 +151,7 @@ export async function checkHttp(config: MonitorHttpConfig): Promise<MonitorCheck
     const requestOptions: RequestInit = {
       method: httpMethod,
       redirect: maxRedirects > 0 ? 'follow' : 'manual',
-      signal: AbortSignal.timeout(10000), // 10秒超时
+      signal: AbortSignal.timeout(connectTimeout * 1000), // 转换为毫秒
       headers: {}
     };
     
@@ -175,21 +178,24 @@ export async function checkHttp(config: MonitorHttpConfig): Promise<MonitorCheck
     // 在前端环境中可能无法直接实现，取决于您的代理服务或后端如何处理此参数
     // 如果需要处理ignoreTls选项，可以通过配置proxyFetch或standardFetch来实现
     
-    // 检查是否启用代理
-    const proxyEnabled = await isProxyEnabled();
-    
-    // 发送请求 - 根据配置使用代理或直接请求
-    let response;
-    try {
+          // 检查是否启用代理
+      const proxyEnabled = await isProxyEnabled();
+      
+      // 发送请求 - 根据配置使用代理或直接请求
+      let response;
+      try {
       response = proxyEnabled ? 
         await proxyFetch(url, requestOptions) : 
         await standardFetch(url, requestOptions);
     } catch (error) {
       const errorMessage = getNetworkErrorMessage(error);
+      const actualTime = Date.now() - startTime;
+      
+      
       return {
         status: MONITOR_STATUS.DOWN,
         message: errorMessage,
-        ping: Date.now() - startTime
+        ping: actualTime
       };
     }
     
@@ -221,10 +227,19 @@ export async function checkHttp(config: MonitorHttpConfig): Promise<MonitorCheck
     }
   } catch (error) {
     const errorMessage = getNetworkErrorMessage(error);
+    const actualTime = Date.now() - startTime;
+    
+    // 调试日志：如果是超时错误，打印实际耗时
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.message.includes('timeout'))) {
+      console.log(`[HTTP检查] 外层超时错误! 配置超时: ${connectTimeout}秒, 实际耗时: ${actualTime}毫秒`);
+    } else {
+      console.log(`[HTTP检查] 外层其他错误: ${errorMessage}, 耗时: ${actualTime}毫秒`);
+    }
+    
     return {
       status: MONITOR_STATUS.DOWN,
       message: errorMessage,
-      ping: Date.now() - startTime
+      ping: actualTime
     };
   }
 }
@@ -239,9 +254,12 @@ export async function checkKeyword(config: MonitorKeywordConfig): Promise<Monito
     statusCodes = '200-299', 
     maxRedirects = 10, 
     requestBody = '', 
-    requestHeaders = ''
+    requestHeaders = '',
+    connectTimeout = 10 // 默认10秒超时
     // ignoreTls 在当前前端实现中未被使用
   } = config;
+  
+
   
   if (!url) {
     return {
@@ -266,7 +284,7 @@ export async function checkKeyword(config: MonitorKeywordConfig): Promise<Monito
     const requestOptions: RequestInit = {
       method: httpMethod,
       redirect: maxRedirects > 0 ? 'follow' : 'manual',
-      signal: AbortSignal.timeout(10000), // 10秒超时
+      signal: AbortSignal.timeout(connectTimeout * 1000), // 转换为毫秒
       headers: {}
     };
     
@@ -352,10 +370,13 @@ export async function checkKeyword(config: MonitorKeywordConfig): Promise<Monito
 export async function checkHttpsCertificate(config: MonitorHttpConfig): Promise<MonitorCheckResult> {
   const { 
     url,
+    connectTimeout = 10, // 默认10秒超时
     monitorId, // 新增参数，用于发送通知
     monitorName // 新增参数，用于发送通知
     // ignoreTls 参数在证书监控中不使用，因为我们始终需要验证证书
   } = config;
+  
+
   
   if (!url) {
     return {
@@ -387,10 +408,11 @@ export async function checkHttpsCertificate(config: MonitorHttpConfig): Promise<
     let certInfo = null;
     
     try {
-      // 使用 ssl-checker 库检查SSL证书，传入端口信息
+      // 使用 ssl-checker 库检查SSL证书，传入端口信息和超时设置
       certInfo = await sslChecker(hostname, {
         method: "GET",
-        port: parseInt(port)
+        port: parseInt(port),
+        timeout: connectTimeout * 1000 // 转换为毫秒
       });
       
       // 获取证书剩余天数

@@ -27,6 +27,7 @@ export interface MonitorHttpConfig {
   ignoreTls?: boolean;
   requestBody?: string;
   requestHeaders?: string | Record<string, string>;
+  connectTimeout?: number;    // HTTP请求连接超时时间（秒），默认10秒
   monitorId?: string;     // 监控项ID，用于发送通知
   monitorName?: string;   // 监控项名称，用于发送通知
   notifyCertExpiry?: boolean; // 是否启用证书到期通知
