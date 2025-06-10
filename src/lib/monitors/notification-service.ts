@@ -61,8 +61,6 @@ export async function sendStatusChangeNotifications(
   message: string,
   prevStatus: number | null
 ) {
-  console.log(`[通知系统] 接收到状态变更 - 监控ID: ${monitorId}, 新状态: ${status}, 上次状态: ${prevStatus}, 消息: ${message}`);
-  
   try {
     // 获取监控项详情
     const monitor = await prisma.monitor.findUnique({
@@ -88,16 +86,11 @@ export async function sendStatusChangeNotifications(
 
     // 如果没有启用的通知配置，则不发送
     if (!monitor.notificationBindings || monitor.notificationBindings.length === 0) {
-      console.log(`[通知系统] 监控 ${monitorId} 没有启用的通知配置，跳过发送`);
       return;
     }
 
-    console.log(`[通知系统] 监控 ${monitorId} 有 ${monitor.notificationBindings.length} 个通知配置`);
-
     // 检查是否为新添加的监控项（状态历史记录数量小于等于1）
     const isNewMonitor = !monitor.statusHistory || monitor.statusHistory.length <= 1;
-
-    console.log(`[通知系统] 监控 ${monitorId} - 是否新监控: ${isNewMonitor}, 历史记录数量: ${monitor.statusHistory?.length || 0}`);
 
     // 使用调度器传入的prevStatus，这是最准确的状态变化信息
     let realPrevStatus = prevStatus;
@@ -111,23 +104,16 @@ export async function sendStatusChangeNotifications(
       }
     }
 
-    console.log(`[通知系统] 监控 ${monitorId} - 原始上次状态: ${prevStatus}, 实际上次状态: ${realPrevStatus}, 当前状态: ${status}`);
-
     // 如果状态没有变化，则不发送通知
     // 注意：当prevStatus为null时，表示这是一个状态变化（从未知状态到当前状态），应该发送通知
     if (prevStatus !== null && realPrevStatus === status) {
-      console.log(`[通知系统] 监控 ${monitorId} 状态没有变化 (${realPrevStatus} -> ${status})，跳过发送`);
       return;
     }
 
     // 如果是新监控项，且状态为正常，则不发送通知
     if (isNewMonitor && status === 1) {
-      console.log(`[通知系统] 监控 ${monitorId} 是新监控且状态正常，跳过发送`);
       return;
     }
-
-    console.log(`[通知系统] 监控 ${monitorId} 通过基本检查，继续处理通知逻辑`);
-    console.log(`[通知系统] 监控 ${monitorId} - resendInterval 设置: ${monitor.resendInterval}`);
 
     // 准备基础通知数据
     const notificationData: NotificationData = {
@@ -181,20 +167,14 @@ export async function sendStatusChangeNotifications(
             }
           });
 
-          console.log(`监控 ${monitorId} - 自上次通知以来的失败次数: ${failuresSinceLastNotification}, 需要达到: ${monitor.resendInterval}`);
-
           // 如果失败次数未达到重复通知间隔，则不发送通知
           if (failuresSinceLastNotification < monitor.resendInterval) {
-            console.log(`监控 ${monitorId} - 失败次数未达到重复通知间隔，跳过通知`);
             return;
           }
-          
-          console.log(`监控 ${monitorId} - 达到重复通知条件，准备发送通知`);
         }
       } else {
         // 如果未设置重复通知间隔（为0），且上次通知状态也是失败，则不发送重复通知
         if (lastNotification && lastNotification.status === 0) {
-          console.log(`监控 ${monitorId} - 未设置重复通知间隔且上次为失败状态，跳过通知`);
           return;
         }
       }
