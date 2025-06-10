@@ -15,6 +15,8 @@ interface MonitorData {
   upsideDown: boolean;
   lastStatus?: number | null;
   name: string;
+  retries: number;
+  retryInterval: number;
 }
 
 // 存储所有监控计划的映射
@@ -260,7 +262,9 @@ async function executeMonitorCheck(monitorId: string) {
         const httpConfig = {
           ...(monitorData.config as unknown as MonitorHttpConfig),
           monitorId: monitorData.id,
-          monitorName: monitorData.name
+          monitorName: monitorData.name,
+          retries: monitorData.retries || 0,
+          retryInterval: monitorData.retryInterval || 60
         };
         const httpResult = await checkers.http(httpConfig);
         status = httpResult.status;
@@ -268,7 +272,12 @@ async function executeMonitorCheck(monitorId: string) {
         ping = httpResult.ping;
         break;
       case 'keyword':
-        const keywordResult = await checkers.keyword(monitorData.config as unknown as MonitorKeywordConfig);
+        const keywordConfig = {
+          ...(monitorData.config as unknown as MonitorKeywordConfig),
+          retries: monitorData.retries || 0,
+          retryInterval: monitorData.retryInterval || 60
+        };
+        const keywordResult = await checkers.keyword(keywordConfig);
         status = keywordResult.status;
         message = keywordResult.message;
         ping = keywordResult.ping;
@@ -278,7 +287,9 @@ async function executeMonitorCheck(monitorId: string) {
         const certConfig = {
           ...(monitorData.config as unknown as MonitorHttpConfig),
           monitorId: monitorData.id,
-          monitorName: monitorData.name
+          monitorName: monitorData.name,
+          retries: monitorData.retries || 0,
+          retryInterval: monitorData.retryInterval || 60
         };
         const certResult = await checkers["https-cert"](certConfig);
         status = certResult.status;
@@ -286,20 +297,35 @@ async function executeMonitorCheck(monitorId: string) {
         ping = certResult.ping;
         break;
       case 'port':
-        const portResult = await checkers.port(monitorData.config as unknown as MonitorPortConfig);
+        const portConfig = {
+          ...(monitorData.config as unknown as MonitorPortConfig),
+          retries: monitorData.retries || 0,
+          retryInterval: monitorData.retryInterval || 60
+        };
+        const portResult = await checkers.port(portConfig);
         status = portResult.status;
         message = portResult.message;
         ping = portResult.ping;
         break;
       case 'mysql':
       case 'redis':
-        const dbResult = await checkers.database(monitorData.type, monitorData.config as unknown as MonitorDatabaseConfig);
+        const dbConfig = {
+          ...(monitorData.config as unknown as MonitorDatabaseConfig),
+          retries: monitorData.retries || 0,
+          retryInterval: monitorData.retryInterval || 60
+        };
+        const dbResult = await checkers.database(monitorData.type, dbConfig);
         status = dbResult.status;
         message = dbResult.message;
         ping = dbResult.ping;
         break;
       case 'icmp':
-        const icmpResult = await checkers.icmp(monitorData.config as unknown as MonitorIcmpConfig);
+        const icmpConfig = {
+          ...(monitorData.config as unknown as MonitorIcmpConfig),
+          retries: monitorData.retries || 0,
+          retryInterval: monitorData.retryInterval || 60
+        };
+        const icmpResult = await checkers.icmp(icmpConfig);
         status = icmpResult.status;
         message = icmpResult.message;
         ping = icmpResult.ping;

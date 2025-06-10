@@ -2,8 +2,8 @@ import { MonitorDatabaseConfig, MonitorCheckResult, MONITOR_STATUS, ERROR_MESSAG
 import { createConnection as createMysqlConnection } from 'mysql2/promise';
 import { createClient } from 'redis';
 
-// 数据库监控检查（统一处理不同类型的数据库）
-export async function checkDatabase(type: string, config: MonitorDatabaseConfig): Promise<MonitorCheckResult> {
+// 数据库监控检查（单次执行，不包含重试逻辑）
+async function checkDatabaseSingle(type: string, config: MonitorDatabaseConfig): Promise<MonitorCheckResult> {
   // 兼容性处理：确保配置存在且至少包含必要字段
   if (!config || typeof config !== 'object') {
     return {
@@ -42,6 +42,44 @@ export async function checkDatabase(type: string, config: MonitorDatabaseConfig)
         ping: null
       };
   }
+}
+
+// 数据库监控检查（包含重试逻辑）
+export async function checkDatabase(type: string, config: MonitorDatabaseConfig): Promise<MonitorCheckResult> {
+  const { retries = 0, retryInterval = 60 } = config;
+  
+  // 执行首次检查
+  const result = await checkDatabaseSingle(type, config);
+  
+  // 如果首次检查成功，直接返回
+  if (result.status === MONITOR_STATUS.UP) {
+    return result;
+  }
+  
+  // 如果配置了重试次数且首次检查失败，进行重试
+  if (retries > 0) {
+    for (let i = 0; i < retries; i++) {
+      // 等待重试间隔时间（秒）
+      await new Promise(resolve => setTimeout(resolve, retryInterval * 1000));
+      
+      // 执行重试检查
+      const retryResult = await checkDatabaseSingle(type, config);
+      
+      if (retryResult.status === MONITOR_STATUS.UP) {
+        return {
+          ...retryResult,
+          message: `重试成功 (${i + 1}/${retries}): ${retryResult.message}`
+        };
+      }
+    }
+    
+    return {
+      ...result,
+      message: `重试${retries}次后仍然失败: ${result.message}`
+    };
+  }
+  
+  return result;
 }
 
 // MySQL监控检查

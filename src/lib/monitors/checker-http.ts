@@ -90,10 +90,8 @@ setInterval(() => {
   }
 }, 60000); // 每分钟检查一次
 
-// HTTP监控检查
-export async function checkHttp(config: MonitorHttpConfig): Promise<MonitorCheckResult> {
-  
-  // 统一与前端配置项，确保兼容性处理
+// HTTP监控检查（单次执行，不包含重试逻辑）
+async function checkHttpSingle(config: MonitorHttpConfig): Promise<MonitorCheckResult> {
   const { 
     url, 
     httpMethod = 'GET', 
@@ -119,8 +117,8 @@ export async function checkHttp(config: MonitorHttpConfig): Promise<MonitorCheck
   const startTime = Date.now();
   
   try {
-          // 如果启用了证书通知且是HTTPS URL，先检查证书状态
-      if (notifyCertExpiry && url.startsWith('https://')) {
+    // 如果启用了证书通知且是HTTPS URL，先检查证书状态
+    if (notifyCertExpiry && url.startsWith('https://')) {
       try {
         // 复用HTTPS证书检查逻辑进行证书检查
         const certResult = await checkHttpsCertificate({ 
@@ -174,23 +172,18 @@ export async function checkHttp(config: MonitorHttpConfig): Promise<MonitorCheck
       requestOptions.body = requestBody;
     }
     
-    // ignoreTls选项处理 - 通常需要在Node.js环境或特定配置中处理
-    // 在前端环境中可能无法直接实现，取决于您的代理服务或后端如何处理此参数
-    // 如果需要处理ignoreTls选项，可以通过配置proxyFetch或standardFetch来实现
+    // 检查是否启用代理
+    const proxyEnabled = await isProxyEnabled();
     
-          // 检查是否启用代理
-      const proxyEnabled = await isProxyEnabled();
-      
-      // 发送请求 - 根据配置使用代理或直接请求
-      let response;
-      try {
+    // 发送请求 - 根据配置使用代理或直接请求
+    let response;
+    try {
       response = proxyEnabled ? 
         await proxyFetch(url, requestOptions) : 
         await standardFetch(url, requestOptions);
     } catch (error) {
       const errorMessage = getNetworkErrorMessage(error);
       const actualTime = Date.now() - startTime;
-      
       
       return {
         status: MONITOR_STATUS.DOWN,
@@ -244,8 +237,46 @@ export async function checkHttp(config: MonitorHttpConfig): Promise<MonitorCheck
   }
 }
 
-// 关键词监控检查
-export async function checkKeyword(config: MonitorKeywordConfig): Promise<MonitorCheckResult> {
+// HTTP监控检查（包含重试逻辑）
+export async function checkHttp(config: MonitorHttpConfig): Promise<MonitorCheckResult> {
+  const { retries = 0, retryInterval = 60 } = config;
+  
+  // 执行首次检查
+  const result = await checkHttpSingle(config);
+  
+  // 如果首次检查成功，直接返回
+  if (result.status === MONITOR_STATUS.UP) {
+    return result;
+  }
+  
+  // 如果配置了重试次数且首次检查失败，进行重试
+  if (retries > 0) {
+    for (let i = 0; i < retries; i++) {
+      // 等待重试间隔时间（秒）
+      await new Promise(resolve => setTimeout(resolve, retryInterval * 1000));
+      
+      // 执行重试检查
+      const retryResult = await checkHttpSingle(config);
+      
+      if (retryResult.status === MONITOR_STATUS.UP) {
+        return {
+          ...retryResult,
+          message: `重试成功 (${i + 1}/${retries}): ${retryResult.message}`
+        };
+      }
+    }
+    
+    return {
+      ...result,
+      message: `重试${retries}次后仍然失败: ${result.message}`
+    };
+  }
+  
+  return result;
+}
+
+// 关键词监控检查（单次执行，不包含重试逻辑）
+async function checkKeywordSingle(config: MonitorKeywordConfig): Promise<MonitorCheckResult> {
   // 统一与前端配置项，确保兼容性处理
   const { 
     url, 
@@ -378,6 +409,44 @@ export async function checkKeyword(config: MonitorKeywordConfig): Promise<Monito
       ping: Date.now() - startTime
     };
   }
+}
+
+// 关键词监控检查（包含重试逻辑）
+export async function checkKeyword(config: MonitorKeywordConfig): Promise<MonitorCheckResult> {
+  const { retries = 0, retryInterval = 60 } = config;
+  
+  // 执行首次检查
+  const result = await checkKeywordSingle(config);
+  
+  // 如果首次检查成功，直接返回
+  if (result.status === MONITOR_STATUS.UP) {
+    return result;
+  }
+  
+  // 如果配置了重试次数且首次检查失败，进行重试
+  if (retries > 0) {
+    for (let i = 0; i < retries; i++) {
+      // 等待重试间隔时间（秒）
+      await new Promise(resolve => setTimeout(resolve, retryInterval * 1000));
+      
+      // 执行重试检查
+      const retryResult = await checkKeywordSingle(config);
+      
+      if (retryResult.status === MONITOR_STATUS.UP) {
+        return {
+          ...retryResult,
+          message: `重试成功 (${i + 1}/${retries}): ${retryResult.message}`
+        };
+      }
+    }
+    
+    return {
+      ...result,
+      message: `重试${retries}次后仍然失败: ${result.message}`
+    };
+  }
+  
+  return result;
 }
 
 // HTTPS证书监控检查

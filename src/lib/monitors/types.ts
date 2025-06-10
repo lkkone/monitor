@@ -32,6 +32,8 @@ export interface MonitorHttpConfig {
   monitorName?: string;   // 监控项名称，用于发送通知
   notifyCertExpiry?: boolean; // 是否启用证书到期通知
   certWarning?: string;   // 临时存储证书警告信息
+  retries?: number;       // 重试次数
+  retryInterval?: number; // 重试间隔（秒）
 }
 
 export interface MonitorKeywordConfig extends MonitorHttpConfig {
@@ -41,6 +43,8 @@ export interface MonitorKeywordConfig extends MonitorHttpConfig {
 export interface MonitorPortConfig {
   hostname: string;
   port: number | string;
+  retries?: number;       // 重试次数
+  retryInterval?: number; // 重试间隔（秒）
 }
 
 export interface MonitorDatabaseConfig extends MonitorPortConfig {
@@ -61,6 +65,8 @@ export interface MonitorIcmpConfig {
   packetCount?: number;   // ping包数量，默认4
   maxPacketLoss?: number; // 最大允许丢包率(%)，默认0
   maxResponseTime?: number; // 最大允许响应时间(ms)
+  retries?: number;       // 重试次数
+  retryInterval?: number; // 重试间隔（秒）
 }
 
 // 监控检查结果接口

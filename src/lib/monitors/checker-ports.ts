@@ -2,11 +2,11 @@ import net from 'net';
 import { MonitorPortConfig, MonitorCheckResult, MONITOR_STATUS, ERROR_MESSAGES } from './types';
 
 /**
- * 检查TCP端口是否开放
+ * 检查TCP端口是否开放（单次执行，不包含重试逻辑）
  * @param config 端口监控配置
  * @returns 检查结果
  */
-export async function checkPort(config: MonitorPortConfig): Promise<MonitorCheckResult> {
+async function checkPortSingle(config: MonitorPortConfig): Promise<MonitorCheckResult> {
   const startTime = Date.now();
   const { hostname, port } = config;
   const portNumber = typeof port === 'string' ? parseInt(port) : port;
@@ -74,4 +74,46 @@ export async function checkPort(config: MonitorPortConfig): Promise<MonitorCheck
       });
     }
   });
+}
+
+/**
+ * 检查TCP端口是否开放（包含重试逻辑）
+ * @param config 端口监控配置
+ * @returns 检查结果
+ */
+export async function checkPort(config: MonitorPortConfig): Promise<MonitorCheckResult> {
+  const { retries = 0, retryInterval = 60 } = config;
+  
+  // 执行首次检查
+  const result = await checkPortSingle(config);
+  
+  // 如果首次检查成功，直接返回
+  if (result.status === MONITOR_STATUS.UP) {
+    return result;
+  }
+  
+  // 如果配置了重试次数且首次检查失败，进行重试
+  if (retries > 0) {
+    for (let i = 0; i < retries; i++) {
+      // 等待重试间隔时间（秒）
+      await new Promise(resolve => setTimeout(resolve, retryInterval * 1000));
+      
+      // 执行重试检查
+      const retryResult = await checkPortSingle(config);
+      
+      if (retryResult.status === MONITOR_STATUS.UP) {
+        return {
+          ...retryResult,
+          message: `重试成功 (${i + 1}/${retries}): ${retryResult.message}`
+        };
+      }
+    }
+    
+    return {
+      ...result,
+      message: `重试${retries}次后仍然失败: ${result.message}`
+    };
+  }
+  
+  return result;
 } 
