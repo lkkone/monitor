@@ -62,6 +62,9 @@ export async function GET(
       case '30d':
         timeAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         break;
+      case '90d':
+        timeAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
       default:
         timeAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
     }

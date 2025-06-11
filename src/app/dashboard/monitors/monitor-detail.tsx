@@ -216,55 +216,138 @@ export function MonitorDetail({
     return { data, labels };
   };
 
-  // 计算在线时间率
+  // 计算在线时间率（基于时间权重的精确计算，90天内数据）
   const calculateUptime = (history: MonitorHistoryRecord[]) => {
     if (!history || history.length === 0) {
-      return "100%";
+      return "100.0000%";
     }
     
-    // 统计成功的检查次数
-    const totalChecks = history.length;
-    const successChecks = history.filter(record => record.status === 1).length;
-    
-    // 计算在线率，如果有监控记录但没有失败记录，则返回100%
-    if (successChecks === totalChecks) {
-      return "100%";
-    }
-    
-    // 计算在线率百分比
-    const uptimePercentage = (successChecks / totalChecks) * 100;
-    return uptimePercentage.toFixed(1) + "%";
-  };
-
-  // 计算可用性（考虑最近24小时的检查）
-  const calculateAvailability = (history: MonitorHistoryRecord[]) => {
-    if (!history || history.length === 0) {
-      return "100%";
-    }
-    
-    // 获取最近24小时的历史记录
+    // 获取最近90天的历史记录
     const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     
     const recentHistory = history.filter(item => 
-      new Date(item.timestamp) >= oneDayAgo
+      new Date(item.timestamp) >= ninetyDaysAgo
+    ).sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
     
     if (recentHistory.length === 0) {
-      return "100%";
+      return "100.0000%";
     }
     
-    // 统计成功的检查次数
-    const totalChecks = recentHistory.length;
-    const successChecks = recentHistory.filter(record => record.status === 1).length;
-    
-    // 计算可用性百分比
-    if (successChecks === totalChecks) {
-      return "100%";
+    if (recentHistory.length === 1) {
+      // 只有一条记录时，根据状态返回
+      return recentHistory[0].status === 1 ? "100.0000%" : "0.0000%";
     }
     
-    const availabilityPercentage = (successChecks / totalChecks) * 100;
-    return availabilityPercentage.toFixed(1) + "%";
+    let totalTime = 0;
+    let uptimeTime = 0;
+    
+    // 计算基于时间间隔的可用性
+    for (let i = 0; i < recentHistory.length - 1; i++) {
+      const currentRecord = recentHistory[i];
+      const nextRecord = recentHistory[i + 1];
+      
+      const currentTime = new Date(currentRecord.timestamp).getTime();
+      const nextTime = new Date(nextRecord.timestamp).getTime();
+      const timeInterval = nextTime - currentTime;
+      
+      totalTime += timeInterval;
+      
+      // 如果当前状态是UP，则认为这段时间是在线的
+      if (currentRecord.status === 1) {
+        uptimeTime += timeInterval;
+      }
+    }
+    
+    // 处理最后一条记录（假设其状态持续到现在或检测间隔时间）
+    const lastRecord = recentHistory[recentHistory.length - 1];
+    const lastTime = new Date(lastRecord.timestamp).getTime();
+    
+    // 假设最后一条记录的状态持续一个检测间隔的时间
+    // 如果监控详情中有间隔信息，使用它；否则默认60秒
+    const assumedInterval = (monitorDetails?.interval || 60) * 1000;
+    // 限制最后一条记录的时间权重，避免因长时间未检查而影响计算准确性
+    const lastInterval = Math.min(now.getTime() - lastTime, assumedInterval * 2);
+    
+    totalTime += lastInterval;
+    if (lastRecord.status === 1) {
+      uptimeTime += lastInterval;
+    }
+    
+    if (totalTime === 0) {
+      return "100.0000%";
+    }
+    
+    const uptimePercentage = (uptimeTime / totalTime) * 100;
+    return uptimePercentage.toFixed(4) + "%";
+  };
+
+  // 计算可用性（考虑最近30天的检查，基于时间权重）
+  const calculateAvailability = (history: MonitorHistoryRecord[]) => {
+    if (!history || history.length === 0) {
+      return "100.0000%";
+    }
+    
+    // 获取最近30天的历史记录
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    const recentHistory = history.filter(item => 
+      new Date(item.timestamp) >= thirtyDaysAgo
+    ).sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+    
+    if (recentHistory.length === 0) {
+      return "100.0000%";
+    }
+    
+    if (recentHistory.length === 1) {
+      // 只有一条记录时，根据状态返回
+      return recentHistory[0].status === 1 ? "100.0000%" : "0.0000%";
+    }
+    
+    let totalTime = 0;
+    let uptimeTime = 0;
+    
+    // 计算基于时间间隔的可用性
+    for (let i = 0; i < recentHistory.length - 1; i++) {
+      const currentRecord = recentHistory[i];
+      const nextRecord = recentHistory[i + 1];
+      
+      const currentTime = new Date(currentRecord.timestamp).getTime();
+      const nextTime = new Date(nextRecord.timestamp).getTime();
+      const timeInterval = nextTime - currentTime;
+      
+      totalTime += timeInterval;
+      
+      // 如果当前状态是UP，则认为这段时间是在线的
+      if (currentRecord.status === 1) {
+        uptimeTime += timeInterval;
+      }
+    }
+    
+    // 处理最后一条记录到现在的时间
+    const lastRecord = recentHistory[recentHistory.length - 1];
+    const lastTime = new Date(lastRecord.timestamp).getTime();
+    
+    // 限制最后一条记录的时间权重，避免因长时间未检查而影响计算准确性
+    const assumedInterval = (monitorDetails?.interval || 60) * 1000;
+    const lastInterval = Math.min(now.getTime() - lastTime, assumedInterval * 2);
+    
+    totalTime += lastInterval;
+    if (lastRecord.status === 1) {
+      uptimeTime += lastInterval;
+    }
+    
+    if (totalTime === 0) {
+      return "100.0000%";
+    }
+    
+    const availabilityPercentage = (uptimeTime / totalTime) * 100;
+    return availabilityPercentage.toFixed(4) + "%";
   };
 
   // 根据屏幕宽度调整状态点数量
@@ -290,7 +373,7 @@ export function MonitorDetail({
     };
   }, []);
 
-  // 获取监控项详情和历史数据
+  // 获取监控项详情和历史数据（用于图表显示）
   const fetchMonitorHistory = async (range: string) => {
     if (!id) return;
     
@@ -306,15 +389,30 @@ export function MonitorDetail({
         ).reverse();
         setStatusPoints(statusPoints);
         
-        // 计算在线时间和可用性
-        setCalculatedUptime(calculateUptime(data));
-        setCalculatedAvailability(calculateAvailability(data));
-        
         // 更新图表
         updateChart(data, range);
       }
     } catch (error) {
       console.error("获取监控历史数据失败", error);
+    }
+  };
+
+  // 获取长期历史数据用于计算在线时间率和可用性
+  const fetchLongTermData = async () => {
+    if (!id) return;
+    
+    try {
+      // 获取90天数据用于在线时间率计算
+      const response90d = await fetch(`/api/monitors/${id}/history?range=90d`);
+      if (response90d.ok) {
+        const data90d = await response90d.json();
+        
+        // 计算在线时间率（90天）和可用性（30天，从90天数据中过滤）
+        setCalculatedUptime(calculateUptime(data90d));
+        setCalculatedAvailability(calculateAvailability(data90d));
+      }
+    } catch (error) {
+      console.error("获取长期历史数据失败", error);
     }
   };
 
@@ -409,6 +507,7 @@ export function MonitorDetail({
     // 设置新的定时器
     refreshTimer.current = setInterval(() => {
       fetchMonitorHistory(timeRange);
+      fetchLongTermData(); // 同时刷新长期数据
     }, 60000); // 每60秒刷新一次
     
     // 组件卸载时清除定时器
@@ -428,6 +527,7 @@ export function MonitorDetail({
       
       chartInstance.current = echarts.init(chartRef.current);
       fetchMonitorHistory(timeRange);
+      fetchLongTermData(); // 获取长期数据用于计算在线时间率和可用性
     }
     
     return () => {
@@ -935,13 +1035,13 @@ export function MonitorDetail({
         </div>
         
         <div className="dark:bg-dark-card bg-light-card rounded-lg border border-primary/15 hover:border-primary/30 transition-all p-4">
-          <div className="text-sm text-foreground/60">在线时间</div>
+          <div className="text-sm text-foreground/60">在线时间率</div>
           <div className="text-2xl font-medium mt-1">{calculatedUptime}</div>
-          <div className="text-xs text-foreground/50 mt-1">30天统计</div>
+          <div className="text-xs text-foreground/50 mt-1">90天统计</div>
         </div>
         
         <div className="dark:bg-dark-card bg-light-card rounded-lg border border-primary/15 hover:border-primary/30 transition-all p-4">
-          <div className="text-sm text-foreground/60">可用性</div>
+          <div className="text-sm text-foreground/60">30天可用性</div>
           <div className="text-2xl font-medium mt-1">{calculatedAvailability}</div>
           <div className="text-xs text-foreground/50 mt-1">30天统计</div>
         </div>
