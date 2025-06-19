@@ -1,5 +1,6 @@
 import axios from 'axios';
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 import { prisma } from '@/lib/db';
 
 // 状态中文描述
@@ -43,6 +44,17 @@ interface WechatConfig {
   pushUrl: string;
   titleTemplate?: string;
   contentTemplate?: string;
+}
+
+// 钉钉推送配置接口
+interface DingTalkConfig {
+  webhookUrl: string;
+  secret?: string;
+}
+
+// 企业微信推送配置接口
+interface WorkWechatConfig {
+  webhookUrl: string;
 }
 
 // 内存缓存，记录每个监控项的最后通知时间和状态
@@ -331,6 +343,19 @@ async function sendNotification(
         contentTemplate: config.contentTemplate as string
       };
       return await sendWechatNotification(wechatConfig, data);
+    case '钉钉推送':
+      // 转换并验证配置
+      const dingtalkConfig: DingTalkConfig = {
+        webhookUrl: String(config.webhookUrl || ''),
+        secret: config.secret as string
+      };
+      return await sendDingTalkNotification(dingtalkConfig, data);
+    case '企业微信推送':
+      // 转换并验证配置
+      const workWechatConfig: WorkWechatConfig = {
+        webhookUrl: String(config.webhookUrl || '')
+      };
+      return await sendWorkWechatNotification(workWechatConfig, data);
     default:
       throw new Error(`不支持的通知类型: ${type}`);
   }
@@ -517,4 +542,183 @@ async function sendWechatNotification(
     },
     timeout: 10000
   });
+}
+
+/**
+ * 发送钉钉推送通知
+ */
+async function sendDingTalkNotification(
+  config: DingTalkConfig,
+  data: NotificationData
+) {
+  const { webhookUrl, secret } = config;
+  const messageType = 'markdown'; // 固定使用markdown格式
+  
+  if (!webhookUrl) {
+    throw new Error('钉钉Webhook URL不能为空');
+  }
+  
+  // 构建消息内容
+  let content = '';
+  const title = `酷监控 - ${data.monitorName} 状态${data.statusText}`;
+  
+  // 使用Markdown消息格式
+  content = `## 🔔 监控状态变更通知\n\n` +
+    `- **监控名称**: ${data.monitorName}\n` +
+    `- **监控类型**: ${data.monitorType}\n` +
+    `- **当前状态**: <font color="${data.statusCode === 1 ? '#10B981' : '#EF4444'}">${data.statusText}</font>\n` +
+    `- **变更时间**: ${data.time}\n`;
+  
+  if (data.failureCount) {
+    content += `- **连续失败次数**: ${data.failureCount} 次\n` +
+      `- **首次失败时间**: ${data.firstFailureTime}\n` +
+      `- **最后失败时间**: ${data.lastFailureTime}\n` +
+      `- **失败持续时间**: ${data.failureDuration} 分钟\n`;
+  }
+  
+  content += `\n**详细信息**:\n\n${data.message}`;
+  
+  // 构建钉钉消息体
+  interface DingTalkMessageBody {
+    msgtype: string;
+    text?: {
+      content: string;
+    };
+    markdown?: {
+      title: string;
+      text: string;
+    };
+    at: {
+      atMobiles: string[];
+      atUserIds: string[];
+      isAtAll: boolean;
+    };
+  }
+  
+  const messageBody: DingTalkMessageBody = {
+    msgtype: messageType,
+    markdown: {
+      title: title,
+      text: content
+    },
+    at: {
+      atMobiles: [],
+      atUserIds: [],
+      isAtAll: false
+    }
+  };
+  
+  // 如果配置了加签密钥，则生成签名
+  let finalUrl = webhookUrl;
+  if (secret) {
+    const timestamp = Date.now();
+    const stringToSign = `${timestamp}\n${secret}`;
+    const sign = crypto.createHmac('sha256', secret).update(stringToSign).digest('base64');
+    const encodedSign = encodeURIComponent(sign);
+    finalUrl = `${webhookUrl}&timestamp=${timestamp}&sign=${encodedSign}`;
+  }
+  
+  console.log(`发送钉钉通知: URL=${webhookUrl}, 监控项=${data.monitorName}, 状态=${data.statusText}`);
+  console.log(`钉钉消息数据: ${JSON.stringify(messageBody)}`);
+  
+  try {
+    // 发送钉钉推送请求
+    const response = await axios.post(finalUrl, messageBody, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'CoolMonitor-DingTalk-Notification'
+      },
+      timeout: 10000
+    });
+    
+    console.log(`钉钉通知发送成功: 状态码=${response.status}, 监控项=${data.monitorName}`);
+    
+    // 检查钉钉API返回的结果
+    if (response.data && response.data.errcode !== 0) {
+      throw new Error(`钉钉API返回错误: ${response.data.errmsg || '未知错误'}`);
+    }
+    
+    return response;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        console.error(`钉钉通知发送失败，服务器响应: 状态码=${error.response.status}, 数据=${JSON.stringify(error.response.data)}, 监控项=${data.monitorName}`);
+      } else if (error.request) {
+        console.error(`钉钉通知发送失败，无响应: ${error.message}, 监控项=${data.monitorName}`);
+      } else {
+        console.error(`钉钉通知发送失败，请求配置错误: ${error.message}, 监控项=${data.monitorName}`);
+      }
+    } else {
+      console.error(`钉钉通知发送失败，未知错误: ${error}, 监控项=${data.monitorName}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * 发送企业微信推送通知
+ */
+async function sendWorkWechatNotification(
+  config: WorkWechatConfig,
+  data: NotificationData
+) {
+  const { webhookUrl } = config;
+  
+  if (!webhookUrl) {
+    throw new Error('企业微信Webhook URL不能为空');
+  }
+  
+  // 构建企业微信消息内容
+  const content = {
+    msgtype: "markdown",
+    markdown: {
+      content: `## 🔔 监控状态变更通知\n\n` +
+        `**监控名称**: ${data.monitorName}\n` +
+        `**监控类型**: ${data.monitorType}\n` +
+        `**当前状态**: <font color="${data.statusCode === 1 ? 'info' : 'warning'}">${data.statusText}</font>\n` +
+        `**变更时间**: ${data.time}\n` +
+        (data.failureCount ? 
+          `**连续失败次数**: ${data.failureCount} 次\n` +
+          `**首次失败时间**: ${data.firstFailureTime}\n` +
+          `**最后失败时间**: ${data.lastFailureTime}\n` +
+          `**失败持续时间**: ${data.failureDuration} 分钟\n` : '') +
+        `\n**详细信息**: ${data.message}`
+    }
+  };
+  
+  console.log(`发送企业微信通知: URL=${webhookUrl}, 监控项=${data.monitorName}, 状态=${data.statusText}`);
+  console.log(`企业微信消息数据: ${JSON.stringify(content)}`);
+  
+  try {
+    // 发送企业微信推送请求
+    const response = await axios.post(webhookUrl, content, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'CoolMonitor-WorkWechat-Notification'
+      },
+      timeout: 10000
+    });
+    
+    console.log(`企业微信通知发送成功: 状态码=${response.status}, 监控项=${data.monitorName}`);
+    
+    // 检查企业微信API返回结果
+    if (response.data && response.data.errcode !== 0) {
+      throw new Error(`企业微信API返回错误: ${response.data.errmsg || '未知错误'}`);
+    }
+    
+    return response;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        console.error(`企业微信通知发送失败，服务器响应: 状态码=${error.response.status}, 数据=${JSON.stringify(error.response.data)}, 监控项=${data.monitorName}`);
+      } else if (error.request) {
+        console.error(`企业微信通知发送失败，无响应: ${error.message}, 监控项=${data.monitorName}`);
+      } else {
+        console.error(`企业微信通知发送失败，请求配置错误: ${error.message}, 监控项=${data.monitorName}`);
+      }
+    } else {
+      console.error(`企业微信通知发送失败，未知错误: ${error}, 监控项=${data.monitorName}`);
+    }
+    throw error;
+  }
 } 

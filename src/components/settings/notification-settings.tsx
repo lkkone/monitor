@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 
-type NotificationType = "邮件" | "Webhook" | "微信推送";
+type NotificationType = "邮件" | "Webhook" | "微信推送" | "钉钉推送" | "企业微信推送";
 
 interface NotificationConfig {
   id: string;
@@ -242,6 +242,23 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
           contentTemplate: "## 监控状态变更通知\n\n- **监控名称**: {monitorName}\n- **监控类型**: {monitorType}\n- **当前状态**: {status}\n- **变更时间**: {time}\n\n{message}"
         };
       }
+      case "钉钉推送": {
+        const webhookUrl = form.querySelector('input[name="dingtalkWebhookUrl"]') as HTMLInputElement;
+        const secret = form.querySelector('input[name="dingtalkSecret"]') as HTMLInputElement;
+        
+        return {
+          webhookUrl: webhookUrl?.value || "",
+          secret: secret?.value || "",
+          messageType: "markdown"
+        };
+      }
+      case "企业微信推送": {
+        const webhookUrl = form.querySelector('input[name="workWechatWebhookUrl"]') as HTMLInputElement;
+        
+        return {
+          webhookUrl: webhookUrl?.value || ""
+        };
+      }
       default:
         return {};
     }
@@ -267,6 +284,16 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
           pushUrl: "",
           titleTemplate: "酷监控 - {monitorName} 状态变更",
           contentTemplate: "## 监控状态变更通知\n\n- **监控名称**: {monitorName}\n- **监控类型**: {monitorType}\n- **当前状态**: {status}\n- **变更时间**: {time}\n\n{message}"
+        };
+      case "钉钉推送":
+        return {
+          webhookUrl: "",
+          secret: "",
+          messageType: "markdown"
+        };
+      case "企业微信推送":
+        return {
+          webhookUrl: ""
         };
       default:
         return {};
@@ -401,6 +428,17 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
     // 重置微信推送表单
     const pushUrlInput = form.querySelector('input[name="pushUrl"]') as HTMLInputElement;
     if (pushUrlInput) pushUrlInput.value = "";
+    
+    // 重置钉钉推送表单
+    const dingtalkWebhookUrlInput = form.querySelector('input[name="dingtalkWebhookUrl"]') as HTMLInputElement;
+    if (dingtalkWebhookUrlInput) dingtalkWebhookUrlInput.value = "";
+    
+    const dingtalkSecretInput = form.querySelector('input[name="dingtalkSecret"]') as HTMLInputElement;
+    if (dingtalkSecretInput) dingtalkSecretInput.value = "";
+    
+    // 重置企业微信推送表单
+    const workWechatWebhookUrlInput = form.querySelector('input[name="workWechatWebhookUrl"]') as HTMLInputElement;
+    if (workWechatWebhookUrlInput) workWechatWebhookUrlInput.value = "";
   };
   
   // 新增一个测试通知的函数
@@ -488,6 +526,8 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
                       notification.type === "邮件" ? "fa-envelope" :
                       notification.type === "Webhook" ? "fa-link" :
                       notification.type === "微信推送" ? "fa-weixin" :
+                      notification.type === "钉钉推送" ? "fa-bell" :
+                      notification.type === "企业微信推送" ? "fa-building" :
                       "fa-paper-plane"
                     } ${notification.enabled ? 'text-primary' : 'text-gray-500'}`}></i>
                   </div>
@@ -614,6 +654,36 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
                   )}
                 </div>
               )}
+              
+              {notification.enabled && notification.type === "钉钉推送" && (
+                                 <div className="mt-3 pl-11 text-sm dark:text-foreground/80 text-light-text-secondary bg-primary/5 p-2 rounded-lg">
+                   <p>Webhook地址: <span className="font-mono text-xs">{String(notification.config.webhookUrl) || "未设置"}</span></p>
+                   {String(notification.config.secret) && (
+                     <p className="mt-1 text-xs text-green-400 flex items-center">
+                       <i className="fas fa-shield-alt mr-1"></i>
+                       已配置加签密钥
+                     </p>
+                   )}
+                   {notification.defaultForNewMonitors && (
+                     <p className="mt-1 text-xs text-yellow-400 flex items-center">
+                       <i className="fas fa-star mr-1"></i>
+                       新增监控项时默认选中此通知
+                     </p>
+                   )}
+                 </div>
+              )}
+              
+              {notification.enabled && notification.type === "企业微信推送" && (
+                <div className="mt-3 pl-11 text-sm dark:text-foreground/80 text-light-text-secondary bg-primary/5 p-2 rounded-lg">
+                  <p>Webhook地址: <span className="font-mono text-xs">{String(notification.config.webhookUrl) || "未设置"}</span></p>
+                  {notification.defaultForNewMonitors && (
+                    <p className="mt-1 text-xs text-yellow-400 flex items-center">
+                      <i className="fas fa-star mr-1"></i>
+                      新增监控项时默认选中此通知
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -622,8 +692,8 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
       {/* 添加/编辑通知方式模态框 */}
       {(isAddModalOpen || currentEditingNotification) && (
         <div className="fixed inset-0 bg-black/60 z-[1000] flex items-center justify-center p-4">
-          <div className="bg-dark-card dark:bg-dark-card bg-light-card w-full max-w-xl rounded-xl shadow-2xl border border-primary/25 animate-fadeIn">
-            <div className="flex justify-between items-center p-5 border-b border-primary/10">
+          <div className="bg-dark-card dark:bg-dark-card bg-light-card w-full max-w-4xl max-h-[90vh] rounded-xl shadow-2xl border border-primary/25 animate-fadeIn flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b border-primary/10 flex-shrink-0">
               <h3 className="text-lg font-medium dark:text-foreground text-light-text-primary">
                 {currentEditingNotification ? "编辑通知方式" : "添加通知方式"}
               </h3>
@@ -639,11 +709,11 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
               </button>
             </div>
             
-            <div id="notification-form" className="p-5 space-y-4">
+            <div id="notification-form" className="p-5 space-y-4 flex-1 overflow-y-auto">
               <div>
                 <label className="text-xs font-medium dark:text-foreground text-light-text-primary">通知类型</label>
-                <div className="mt-2 grid grid-cols-3 gap-3">
-                  {(["邮件", "Webhook", "微信推送"] as NotificationType[]).map((type) => (
+                <div className="mt-2 grid grid-cols-5 gap-3">
+                  {(["邮件", "Webhook", "微信推送", "钉钉推送", "企业微信推送"] as NotificationType[]).map((type) => (
                     <button
                       key={type}
                       type="button"
@@ -661,7 +731,10 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
                       <i className={`fas ${
                         type === "邮件" ? "fa-envelope" :
                         type === "Webhook" ? "fa-link" :
-                        "fa-weixin"
+                        type === "微信推送" ? "fa-weixin" :
+                        type === "钉钉推送" ? "fa-bell" :
+                        type === "企业微信推送" ? "fa-building" :
+                        "fa-paper-plane"
                       } mr-2`}></i>
                       <span>{type}</span>
                     </button>
@@ -833,9 +906,96 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
                   </div>
                 </div>
               )}
+
+              {/* 钉钉推送配置项 */}
+              {selectedType === "钉钉推送" && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-medium dark:text-foreground text-light-text-primary">钉钉Webhook URL</label>
+                    <input 
+                      type="url" 
+                      name="dingtalkWebhookUrl"
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-primary/20 bg-dark-nav dark:bg-dark-nav bg-light-nav dark:text-foreground text-light-text-primary focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                      placeholder="https://oapi.dingtalk.com/robot/send?access_token=xxxxxx"
+                      defaultValue={currentEditingNotification?.config?.webhookUrl as string || ""}
+                    />
+                    <p className="mt-1 text-xs dark:text-foreground text-light-text-secondary">
+                      请输入钉钉群机器人的Webhook地址
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium dark:text-foreground text-light-text-primary">加签密钥（可选）</label>
+                    <input 
+                      type="password" 
+                      name="dingtalkSecret"
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-primary/20 bg-dark-nav dark:bg-dark-nav bg-light-nav dark:text-foreground text-light-text-primary focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                      placeholder="SEC开头的加签密钥"
+                      defaultValue={currentEditingNotification?.config?.secret as string || ""}
+                    />
+                    <p className="mt-1 text-xs dark:text-foreground text-light-text-secondary">
+                      如果机器人启用了加签验证，请填入加签密钥
+                    </p>
+                  </div>
+
+                  {/* 添加钉钉机器人配置说明 */}
+                  <div className="mt-3 p-4 bg-primary/5 rounded-lg border border-primary/10">
+                    <h3 className="text-sm font-medium mb-3 dark:text-foreground text-light-text-primary">钉钉群机器人配置说明</h3>
+                                         <ol className="text-xs dark:text-foreground/70 text-light-text-secondary list-decimal pl-5 space-y-2">
+                       <li>在钉钉群中添加&ldquo;自定义机器人&rdquo;</li>
+                       <li>安全设置选择&ldquo;加签&rdquo;方式（推荐）或&ldquo;自定义关键词&rdquo;</li>
+                       <li>如选择加签方式，请将生成的密钥填入上方&ldquo;加签密钥&rdquo;字段</li>
+                       <li>如选择关键词方式，请添加&ldquo;酷监控&rdquo;作为关键词</li>
+                       <li>复制Webhook地址到上方URL字段</li>
+                     </ol>
+                    <div className="mt-3 p-3 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                      <p className="text-xs text-orange-400 flex items-center">
+                        <i className="fas fa-exclamation-triangle mr-2"></i>
+                        注意：请确保机器人安全设置正确配置，否则可能无法正常发送消息
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 企业微信推送配置项 */}
+              {selectedType === "企业微信推送" && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-medium dark:text-foreground text-light-text-primary">企业微信Webhook URL</label>
+                    <input 
+                      type="url" 
+                      name="workWechatWebhookUrl"
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-primary/20 bg-dark-nav dark:bg-dark-nav bg-light-nav dark:text-foreground text-light-text-primary focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                      placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxxx"
+                      defaultValue={currentEditingNotification?.config?.webhookUrl as string || ""}
+                    />
+                    <p className="mt-1 text-xs dark:text-foreground text-light-text-secondary">
+                      请输入企业微信群机器人的Webhook地址
+                    </p>
+                  </div>
+
+                  {/* 添加企业微信机器人配置说明 */}
+                  <div className="mt-3 p-4 bg-primary/5 rounded-lg border border-primary/10">
+                    <h3 className="text-sm font-medium mb-3 dark:text-foreground text-light-text-primary">企业微信群机器人配置说明</h3>
+                                         <ol className="text-xs dark:text-foreground/70 text-light-text-secondary list-decimal pl-5 space-y-2">
+                       <li>在企业微信群聊中添加&ldquo;群机器人&rdquo;</li>
+                       <li>选择&ldquo;自定义机器人&rdquo;类型</li>
+                       <li>复制生成的Webhook地址到上方URL字段</li>
+                       <li>企业微信机器人无需额外的签名验证</li>
+                     </ol>
+                    <div className="mt-3 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                      <p className="text-xs text-blue-400 flex items-center">
+                        <i className="fas fa-info-circle mr-2"></i>
+                        企业微信机器人支持Markdown格式消息，可以显示丰富的状态信息
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             
-            <div className="flex justify-end p-5 bg-dark-nav/50 dark:bg-dark-nav/50 bg-light-nav/50 border-t border-primary/10">
+            <div className="flex justify-end p-5 bg-dark-nav/50 dark:bg-dark-nav/50 bg-light-nav/50 border-t border-primary/10 flex-shrink-0">
               <button 
                 onClick={(e) => {
                   e.preventDefault();

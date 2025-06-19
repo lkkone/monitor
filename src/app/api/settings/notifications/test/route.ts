@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import axios from 'axios';
+import crypto from 'crypto';
 import { validateAuth } from '@/lib/auth-helpers';
 
 // 定义不同类型通知的配置接口
@@ -20,6 +21,15 @@ interface WechatConfig {
   pushUrl: string;
   titleTemplate?: string;
   contentTemplate?: string;
+}
+
+interface DingTalkConfig {
+  webhookUrl: string;
+  secret?: string;
+}
+
+interface WorkWechatConfig {
+  webhookUrl: string;
 }
 
 // 测试通知接口
@@ -48,6 +58,10 @@ export async function POST(request: NextRequest) {
         return await testWebhookNotification(name, config as WebhookConfig);
       case '微信推送':
         return await testWechatNotification(name, config as WechatConfig);
+      case '钉钉推送':
+        return await testDingTalkNotification(name, config as DingTalkConfig);
+      case '企业微信推送':
+        return await testWorkWechatNotification(name, config as WorkWechatConfig);
       default:
         return NextResponse.json(
           { success: false, error: '不支持的通知类型' },
@@ -192,6 +206,132 @@ async function testWebhookNotification(name: string, config: WebhookConfig) {
   }
 }
 
+// 测试钉钉推送通知
+async function testDingTalkNotification(name: string, config: DingTalkConfig) {
+  const { webhookUrl, secret } = config;
+  const messageType = 'markdown'; // 固定使用markdown格式
+  
+  if (!webhookUrl) {
+    return NextResponse.json(
+      { success: false, error: '钉钉Webhook URL不能为空' },
+      { status: 400 }
+    );
+  }
+  
+  try {
+    console.log(`开始测试钉钉推送: ${name}, URL: ${webhookUrl}`);
+    
+    // 构建测试消息内容
+    let content = '';
+    const title = `酷监控 - 测试通知 - ${name}`;
+    
+    // 使用Markdown消息格式
+    content = `## 🔔 酷监控通知测试\n\n` +
+      `- **通知渠道名称**: ${name}\n` +
+      `- **测试时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n` +
+      `如果您收到此消息，表示您的钉钉推送设置已配置成功！`;
+    
+    // 构建钉钉消息体
+    interface DingTalkMessageBody {
+      msgtype: string;
+      text?: {
+        content: string;
+      };
+      markdown?: {
+        title: string;
+        text: string;
+      };
+      at: {
+        atMobiles: string[];
+        atUserIds: string[];
+        isAtAll: boolean;
+      };
+    }
+    
+    const messageBody: DingTalkMessageBody = {
+      msgtype: messageType,
+      markdown: {
+        title: title,
+        text: content
+      },
+      at: {
+        atMobiles: [],
+        atUserIds: [],
+        isAtAll: false
+      }
+    };
+    
+    // 如果配置了加签密钥，则生成签名
+    let finalUrl = webhookUrl;
+    if (secret) {
+      const timestamp = Date.now();
+      const stringToSign = `${timestamp}\n${secret}`;
+      const sign = crypto.createHmac('sha256', secret).update(stringToSign).digest('base64');
+      const encodedSign = encodeURIComponent(sign);
+      finalUrl = `${webhookUrl}&timestamp=${timestamp}&sign=${encodedSign}`;
+    }
+    
+    console.log(`钉钉推送测试数据: ${JSON.stringify(messageBody)}`);
+    
+    // 发送钉钉推送请求
+    const response = await axios.post(finalUrl, messageBody, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'CoolMonitor-DingTalk-Notification'
+      },
+      timeout: 10000
+    });
+    
+    console.log(`钉钉推送测试响应: 状态码=${response.status}, 数据=${JSON.stringify(response.data)}`);
+    
+    // 检查钉钉API返回的结果
+    if (response.data && response.data.errcode !== undefined) {
+      if (response.data.errcode === 0) {
+        return NextResponse.json({ success: true, message: '测试钉钉推送已成功发送' });
+      } else {
+        return NextResponse.json(
+          { success: false, error: `钉钉API返回错误: ${response.data.errmsg || '未知错误'}` },
+          { status: 400 }
+        );
+      }
+    } else if (response.status >= 200 && response.status < 300) {
+      return NextResponse.json({ success: true, message: '测试钉钉推送已成功发送' });
+    } else {
+      return NextResponse.json(
+        { success: false, error: `钉钉推送请求失败，响应状态码: ${response.status}` },
+        { status: 400 }
+      );
+    }
+  } catch (error) {
+    console.error('发送钉钉推送通知失败:', error);
+    let errorMessage = '发送钉钉推送请求失败';
+    
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        console.error(`钉钉推送请求失败，服务器响应: 状态码=${error.response.status}, 数据=${JSON.stringify(error.response.data)}`);
+        errorMessage += `: 服务器返回状态码 ${error.response.status}`;
+        if (error.response.data && error.response.data.errmsg) {
+          errorMessage += ` - ${error.response.data.errmsg}`;
+        }
+      } else if (error.request) {
+        console.error(`钉钉推送请求失败，无响应: ${error.message}`);
+        errorMessage += `: 请求发送成功但未收到响应，可能是网络问题或URL无效`;
+      } else {
+        console.error(`钉钉推送请求失败，请求配置错误: ${error.message}`);
+        errorMessage += `: ${error.message}`;
+      }
+    } else if (error instanceof Error) {
+      console.error(`钉钉推送请求失败，其他错误: ${error.message}`);
+      errorMessage += `: ${error.message}`;
+    }
+    
+    return NextResponse.json(
+      { success: false, error: errorMessage },
+      { status: 500 }
+    );
+  }
+}
+
 // 测试微信推送通知
 async function testWechatNotification(name: string, config: WechatConfig) {
   const { pushUrl } = config;
@@ -249,6 +389,95 @@ async function testWechatNotification(name: string, config: WechatConfig) {
       }
     } else if (error instanceof Error) {
       console.error(`微信推送请求失败，其他错误: ${error.message}`);
+      errorMessage += `: ${error.message}`;
+    }
+    
+    return NextResponse.json(
+      { success: false, error: errorMessage },
+      { status: 500 }
+    );
+  }
+}
+
+// 测试企业微信推送通知
+async function testWorkWechatNotification(name: string, config: WorkWechatConfig) {
+  const { webhookUrl } = config;
+  
+  if (!webhookUrl) {
+    return NextResponse.json(
+      { success: false, error: '企业微信Webhook URL不能为空' },
+      { status: 400 }
+    );
+  }
+  
+  try {
+    console.log(`开始测试企业微信推送: ${name}, URL: ${webhookUrl}`);
+    
+    // 构建测试消息内容
+    const content = `## 🔔 酷监控通知测试\n\n` +
+      `- **通知渠道名称**: ${name}\n` +
+      `- **测试时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n` +
+      `如果您收到此消息，表示您的企业微信推送设置已配置成功！`;
+    
+    // 构建企业微信消息体
+    const messageBody = {
+      msgtype: 'markdown',
+      markdown: {
+        content: content
+      }
+    };
+    
+    console.log(`企业微信推送测试数据: ${JSON.stringify(messageBody)}`);
+    
+    // 发送企业微信推送请求
+    const response = await axios.post(webhookUrl, messageBody, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'CoolMonitor-WorkWechat-Notification'
+      },
+      timeout: 10000
+    });
+    
+    console.log(`企业微信推送测试响应: 状态码=${response.status}, 数据=${JSON.stringify(response.data)}`);
+    
+    // 检查企业微信API返回的结果
+    if (response.data && response.data.errcode !== undefined) {
+      if (response.data.errcode === 0) {
+        return NextResponse.json({ success: true, message: '测试企业微信推送已成功发送' });
+      } else {
+        return NextResponse.json(
+          { success: false, error: `企业微信API返回错误: ${response.data.errmsg || '未知错误'}` },
+          { status: 400 }
+        );
+      }
+    } else if (response.status >= 200 && response.status < 300) {
+      return NextResponse.json({ success: true, message: '测试企业微信推送已成功发送' });
+    } else {
+      return NextResponse.json(
+        { success: false, error: `企业微信推送请求失败，响应状态码: ${response.status}` },
+        { status: 400 }
+      );
+    }
+  } catch (error) {
+    console.error('发送企业微信推送通知失败:', error);
+    let errorMessage = '发送企业微信推送请求失败';
+    
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        console.error(`企业微信推送请求失败，服务器响应: 状态码=${error.response.status}, 数据=${JSON.stringify(error.response.data)}`);
+        errorMessage += `: 服务器返回状态码 ${error.response.status}`;
+        if (error.response.data && error.response.data.errmsg) {
+          errorMessage += ` - ${error.response.data.errmsg}`;
+        }
+      } else if (error.request) {
+        console.error(`企业微信推送请求失败，无响应: ${error.message}`);
+        errorMessage += `: 请求发送成功但未收到响应，可能是网络问题或URL无效`;
+      } else {
+        console.error(`企业微信推送请求失败，请求配置错误: ${error.message}`);
+        errorMessage += `: ${error.message}`;
+      }
+    } else if (error instanceof Error) {
+      console.error(`企业微信推送请求失败，其他错误: ${error.message}`);
       errorMessage += `: ${error.message}`;
     }
     
