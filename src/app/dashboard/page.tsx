@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MonitorForm } from "./monitors/monitor-form";
@@ -51,6 +51,9 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
   const [monitors, setMonitors] = useState<MonitorItemData[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // 添加滚动容器的引用
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
   // 获取所有监控项
   useEffect(() => {
     const fetchMonitors = async () => {
@@ -75,6 +78,27 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
     
     fetchMonitors();
   }, [activeMonitorId]);
+
+  // 滚动到当前选中的监控项
+  useEffect(() => {
+    // 确保数据加载完成且有选中的监控项
+    if (!loading && activeMonitorId && monitors.length > 0) {
+      // 延迟执行，确保DOM完全渲染
+      const timer = setTimeout(() => {
+        const selectedButton = document.querySelector(`[data-monitor-id="${activeMonitorId}"]`) as HTMLElement;
+        if (selectedButton) {
+          // 使用 scrollIntoView 方法滚动到选中项
+          selectedButton.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center', // 将元素滚动到可视区域的中央
+            inline: 'nearest'
+          });
+        }
+      }, 300); // 延迟确保DOM完全渲染
+      
+      return () => clearTimeout(timer);
+    }
+  }, [loading, activeMonitorId, monitors]);
   
   const filteredItems = monitors.filter(item => {
     // 名称匹配
@@ -174,7 +198,10 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
           <i className="fas fa-search absolute right-4 top-1/2 -translate-y-1/2 text-foreground/50"></i>
         </div>
         <div className="text-sm text-foreground/50 px-4 mb-3">监控列表</div>
-        <div className="space-y-2.5 overflow-y-auto max-h-[calc(100vh-250px)] pr-1">
+        <div 
+          ref={scrollContainerRef}
+          className="space-y-2.5 overflow-y-auto max-h-[calc(100vh-250px)] pr-1"
+        >
           {loading ? (
             <div className="text-center py-4 text-foreground/60">
               <i className="fas fa-spinner fa-spin mr-2"></i>
@@ -190,6 +217,7 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
               return (
                 <button 
                   key={item.id}
+                  data-monitor-id={item.id}
                   onClick={() => handleMonitorClick(item.id)}
                   className={`flex items-center px-4 py-3 rounded-lg w-full text-left ${
                     activeItems.includes(item.id) ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground/90"
@@ -527,6 +555,8 @@ export default function DashboardPage() {
   const [selectedMonitor, setSelectedMonitor] = useState<string | null>(monitorId);
   const [monitorData, setMonitorData] = useState<MonitorDetailData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+
   
   // 监听 URL 参数变化
   useEffect(() => {
