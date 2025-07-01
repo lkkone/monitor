@@ -2,6 +2,7 @@ import axios from 'axios';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { prisma } from '@/lib/db';
+import { formatDateTime } from './utils';
 
 // 状态中文描述
 const STATUS_TEXT_CN: Record<number, string> = {
@@ -134,7 +135,7 @@ export async function sendStatusChangeNotifications(
       status: STATUS_TEXT_CN[status] || '未知', // 使用中文状态描述
       statusText: STATUS_TEXT_CN[status] || '未知',
       statusCode: status, // 保存原始状态码
-      time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+      time: formatDateTime(),
       message: message || '无详细信息'
     };
 
@@ -238,10 +239,10 @@ export async function sendStatusChangeNotifications(
       const aggregatedData = {
         ...notificationData,
         failureCount: totalFailures,
-        firstFailureTime: firstContinuousFailure?.timestamp.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) || '未知',
-        lastFailureTime: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+        firstFailureTime: firstContinuousFailure ? formatDateTime(firstContinuousFailure.timestamp) : '未知',
+        lastFailureTime: formatDateTime(),
         failureDuration: duration,
-        message: `连续失败 ${totalFailures} 次，首次失败于 ${firstContinuousFailure?.timestamp.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) || '未知'}，持续 ${duration} 分钟\n${notificationData.message}`
+        message: `连续失败 ${totalFailures} 次，首次失败于 ${firstContinuousFailure ? formatDateTime(firstContinuousFailure.timestamp) : '未知'}，持续 ${duration} 分钟\n${notificationData.message}`
       };
 
       // 发送聚合通知

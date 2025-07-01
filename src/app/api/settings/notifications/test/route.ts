@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import axios from 'axios';
 import crypto from 'crypto';
+import { formatDateTime } from '@/lib/monitors/utils';
 import { validateAuth } from '@/lib/auth-helpers';
 
 // 定义不同类型通知的配置接口
@@ -151,7 +152,7 @@ async function testWebhookNotification(name: string, config: WebhookConfig) {
         type: 'http',
         status: '正常',  // 中文状态描述
         status_code: 1,  // 状态码: 1=正常
-        time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+        time: formatDateTime(),
         message: '这是一条来自酷监控的测试通知'
       },
       // 添加失败信息结构，与实际通知保持一致
@@ -228,7 +229,7 @@ async function testDingTalkNotification(name: string, config: DingTalkConfig) {
     // 使用Markdown消息格式
     content = `## 🔔 酷监控通知测试\n\n` +
       `- **通知渠道名称**: ${name}\n` +
-      `- **测试时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n` +
+      `- **测试时间**: ${formatDateTime()}\n\n` +
       `如果您收到此消息，表示您的钉钉推送设置已配置成功！`;
     
     // 构建钉钉消息体
@@ -346,7 +347,7 @@ async function testWechatNotification(name: string, config: WechatConfig) {
   try {
     // 准备测试数据
     const title = '酷监控 - 测试通知';
-    const content = `## 酷监控通知测试\n\n这是来自酷监控系统的测试通知。\n\n- **通知渠道**: ${name}\n- **测试时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n如果您收到此通知，表示您的微信推送设置已配置成功！`;
+    const content = `## 酷监控通知测试\n\n这是来自酷监控系统的测试通知。\n\n- **通知渠道**: ${name}\n- **测试时间**: ${formatDateTime()}\n\n如果您收到此通知，表示您的微信推送设置已配置成功！`;
     
     console.log(`开始测试微信推送: ${name}, URL: ${pushUrl}`);
     console.log(`微信推送测试数据: 标题=${title}, 内容=${content}`);
@@ -416,7 +417,7 @@ async function testWorkWechatNotification(name: string, config: WorkWechatConfig
     // 构建测试消息内容
     const content = `## 🔔 酷监控通知测试\n\n` +
       `- **通知渠道名称**: ${name}\n` +
-      `- **测试时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n` +
+      `- **测试时间**: ${formatDateTime()}\n\n` +
       `如果您收到此消息，表示您的企业微信推送设置已配置成功！`;
     
     // 构建企业微信消息体
