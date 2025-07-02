@@ -256,82 +256,120 @@ async function executeMonitorCheck(monitorId: string) {
     }
     
     // 对于非 Push 类型，执行常规检查
-    switch (monitorData.type) {
-      case 'http':
-        // 为HTTP检查添加监控ID和名称，支持证书通知功能
-        const httpConfig = {
-          ...(monitorData.config as unknown as MonitorHttpConfig),
-          monitorId: monitorData.id,
-          monitorName: monitorData.name,
-          retries: monitorData.retries || 0,
-          retryInterval: monitorData.retryInterval || 60
-        };
-        const httpResult = await checkers.http(httpConfig);
-        status = httpResult.status;
-        message = httpResult.message;
-        ping = httpResult.ping;
-        break;
-      case 'keyword':
-        const keywordConfig = {
-          ...(monitorData.config as unknown as MonitorKeywordConfig),
-          retries: monitorData.retries || 0,
-          retryInterval: monitorData.retryInterval || 60
-        };
-        const keywordResult = await checkers.keyword(keywordConfig);
-        status = keywordResult.status;
-        message = keywordResult.message;
-        ping = keywordResult.ping;
-        break;
-      case 'https-cert':
-        // 为证书检查添加监控ID和名称，用于定时通知
-        const certConfig = {
-          ...(monitorData.config as unknown as MonitorHttpConfig),
-          monitorId: monitorData.id,
-          monitorName: monitorData.name,
-          retries: monitorData.retries || 0,
-          retryInterval: monitorData.retryInterval || 60
-        };
-        const certResult = await checkers["https-cert"](certConfig);
-        status = certResult.status;
-        message = certResult.message;
-        ping = certResult.ping;
-        break;
-      case 'port':
-        const portConfig = {
-          ...(monitorData.config as unknown as MonitorPortConfig),
-          retries: monitorData.retries || 0,
-          retryInterval: monitorData.retryInterval || 60
-        };
-        const portResult = await checkers.port(portConfig);
-        status = portResult.status;
-        message = portResult.message;
-        ping = portResult.ping;
-        break;
-      case 'mysql':
-      case 'redis':
-        const dbConfig = {
-          ...(monitorData.config as unknown as MonitorDatabaseConfig),
-          retries: monitorData.retries || 0,
-          retryInterval: monitorData.retryInterval || 60
-        };
-        const dbResult = await checkers.database(monitorData.type, dbConfig);
-        status = dbResult.status;
-        message = dbResult.message;
-        ping = dbResult.ping;
-        break;
-      case 'icmp':
-        const icmpConfig = {
-          ...(monitorData.config as unknown as MonitorIcmpConfig),
-          retries: monitorData.retries || 0,
-          retryInterval: monitorData.retryInterval || 60
-        };
-        const icmpResult = await checkers.icmp(icmpConfig);
-        status = icmpResult.status;
-        message = icmpResult.message;
-        ping = icmpResult.ping;
-        break;
-      default:
-        message = `不支持的监控类型: ${monitorData.type}`;
+    let checkResult: { status: number; message: string; ping: number | null } | null = null;
+
+    // 执行检查（包含重试逻辑）
+    const maxAttempts = (monitorData.retries || 0) + 1; // 重试次数 + 1次原始检查
+    let lastError: string = '';
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        // 如果不是第一次尝试，等待重试间隔
+        if (attempt > 0) {
+          await new Promise(resolve => setTimeout(resolve, (monitorData.retryInterval || 60) * 1000));
+        }
+
+        switch (monitorData.type) {
+          case 'http':
+            // 为HTTP检查添加监控ID和名称，支持证书通知功能
+            const httpConfig = {
+              ...(monitorData.config as unknown as MonitorHttpConfig),
+              monitorId: monitorData.id,
+              monitorName: monitorData.name,
+              retries: 0, // 在调度器层面处理重试，检查器不需要重试
+              retryInterval: 60
+            };
+            const httpResult = await checkers.http(httpConfig);
+            checkResult = { status: httpResult.status, message: httpResult.message, ping: httpResult.ping };
+            break;
+          case 'keyword':
+            const keywordConfig = {
+              ...(monitorData.config as unknown as MonitorKeywordConfig),
+              retries: 0, // 在调度器层面处理重试，检查器不需要重试
+              retryInterval: 60
+            };
+            const keywordResult = await checkers.keyword(keywordConfig);
+            checkResult = { status: keywordResult.status, message: keywordResult.message, ping: keywordResult.ping };
+            break;
+          case 'https-cert':
+            // 为证书检查添加监控ID和名称，用于定时通知
+            const certConfig = {
+              ...(monitorData.config as unknown as MonitorHttpConfig),
+              monitorId: monitorData.id,
+              monitorName: monitorData.name,
+              retries: 0, // 在调度器层面处理重试，检查器不需要重试
+              retryInterval: 60
+            };
+            const certResult = await checkers["https-cert"](certConfig);
+            checkResult = { status: certResult.status, message: certResult.message, ping: certResult.ping };
+            break;
+          case 'port':
+            const portConfig = {
+              ...(monitorData.config as unknown as MonitorPortConfig),
+              retries: 0, // 在调度器层面处理重试，检查器不需要重试
+              retryInterval: 60
+            };
+            const portResult = await checkers.port(portConfig);
+            checkResult = { status: portResult.status, message: portResult.message, ping: portResult.ping };
+            break;
+          case 'mysql':
+          case 'redis':
+            const dbConfig = {
+              ...(monitorData.config as unknown as MonitorDatabaseConfig),
+              retries: 0, // 在调度器层面处理重试，检查器不需要重试
+              retryInterval: 60
+            };
+            const dbResult = await checkers.database(monitorData.type, dbConfig);
+            checkResult = { status: dbResult.status, message: dbResult.message, ping: dbResult.ping };
+            break;
+          case 'icmp':
+            const icmpConfig = {
+              ...(monitorData.config as unknown as MonitorIcmpConfig),
+              retries: 0, // 在调度器层面处理重试，检查器不需要重试
+              retryInterval: 60
+            };
+            const icmpResult = await checkers.icmp(icmpConfig);
+            checkResult = { status: icmpResult.status, message: icmpResult.message, ping: icmpResult.ping };
+            break;
+          default:
+            checkResult = { status: MONITOR_STATUS.DOWN, message: `不支持的监控类型: ${monitorData.type}`, ping: null };
+        }
+
+        // 如果检查成功，跳出重试循环
+        if (checkResult && checkResult.status === MONITOR_STATUS.UP) {
+          // 如果是重试成功，更新消息
+          if (attempt > 0) {
+            checkResult.message = `重试成功 (${attempt}/${monitorData.retries || 0}): ${checkResult.message}`;
+          }
+          break;
+        }
+
+        // 记录失败信息，但不跳出循环（继续重试）
+        if (checkResult) {
+          lastError = checkResult.message;
+        }
+      } catch (error) {
+        console.error(`监控检查失败 ${monitorId} (尝试 ${attempt + 1}/${maxAttempts}):`, error);
+        lastError = `监控检查异常: ${(error instanceof Error) ? error.message : '未知错误'}`;
+        checkResult = { status: MONITOR_STATUS.DOWN, message: lastError, ping: null };
+      }
+    }
+
+    // 设置最终结果
+    if (checkResult) {
+      status = checkResult.status;
+      message = checkResult.message;
+      ping = checkResult.ping;
+      
+      // 如果所有重试都失败了，更新消息
+      if (status === MONITOR_STATUS.DOWN && maxAttempts > 1) {
+        message = `重试${monitorData.retries || 0}次后仍然失败: ${lastError}`;
+      }
+    } else {
+      // 如果没有检查结果，设置为失败状态
+      status = MONITOR_STATUS.DOWN;
+      message = lastError || '监控检查失败';
+      ping = null;
     }
   } catch (error) {
     console.error(`监控检查失败 ${monitorId}:`, error);

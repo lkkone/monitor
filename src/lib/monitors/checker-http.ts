@@ -241,6 +241,11 @@ async function checkHttpSingle(config: MonitorHttpConfig): Promise<MonitorCheckR
 export async function checkHttp(config: MonitorHttpConfig): Promise<MonitorCheckResult> {
   const { retries = 0, retryInterval = 60 } = config;
   
+  // 如果没有设置重试次数，直接执行单次检查
+  if (retries === 0) {
+    return await checkHttpSingle(config);
+  }
+  
   // 执行首次检查
   const result = await checkHttpSingle(config);
   
@@ -415,6 +420,11 @@ async function checkKeywordSingle(config: MonitorKeywordConfig): Promise<Monitor
 export async function checkKeyword(config: MonitorKeywordConfig): Promise<MonitorCheckResult> {
   const { retries = 0, retryInterval = 60 } = config;
   
+  // 如果没有设置重试次数，直接执行单次检查
+  if (retries === 0) {
+    return await checkKeywordSingle(config);
+  }
+  
   // 执行首次检查
   const result = await checkKeywordSingle(config);
   
@@ -488,7 +498,7 @@ export async function checkHttpsCertificate(config: MonitorHttpConfig): Promise<
     
     let daysRemaining = -1;
     let certificateWarning = '';
-    let certInfo = null;
+    let certInfo: { valid: boolean; daysRemaining: number } | null = null;
     
     try {
       // 使用 ssl-checker 库检查SSL证书，传入端口信息和超时设置
@@ -499,10 +509,12 @@ export async function checkHttpsCertificate(config: MonitorHttpConfig): Promise<
       });
       
       // 获取证书剩余天数
-      daysRemaining = certInfo.daysRemaining;
+      if (certInfo && typeof certInfo.daysRemaining === 'number') {
+        daysRemaining = certInfo.daysRemaining;
+      }
       
       // 如果有监控ID和名称，并且证书将要过期或已过期，检查是否需要发送通知
-      if (monitorId && monitorName) {
+      if (monitorId && monitorName && certInfo) {
         // 证书状态：正常 -> UP，已过期 -> DOWN
         const certStatus = certInfo.valid === true ? MONITOR_STATUS.UP : MONITOR_STATUS.DOWN;
         
@@ -516,7 +528,7 @@ export async function checkHttpsCertificate(config: MonitorHttpConfig): Promise<
       }
 
       // 检查证书是否有效
-      if (certInfo.valid === false) {
+      if (certInfo && certInfo.valid === false) {
         return {
           status: MONITOR_STATUS.DOWN,
           message: '证书无效',

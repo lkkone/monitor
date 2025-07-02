@@ -84,6 +84,11 @@ async function checkPortSingle(config: MonitorPortConfig): Promise<MonitorCheckR
 export async function checkPort(config: MonitorPortConfig): Promise<MonitorCheckResult> {
   const { retries = 0, retryInterval = 60 } = config;
   
+  // 如果没有设置重试次数，直接执行单次检查
+  if (retries === 0) {
+    return await checkPortSingle(config);
+  }
+  
   // 执行首次检查
   const result = await checkPortSingle(config);
   
