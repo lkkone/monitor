@@ -76,6 +76,14 @@ export function Header() {
             
             <button 
               className="p-2 rounded-button hover:bg-primary/10 transition-colors dark:text-white text-light-text-primary"
+              onClick={() => router.push('/dashboard/status-pages')}
+              aria-label="状态页管理"
+            >
+              <i className="fas fa-chart-line"></i>
+            </button>
+            
+            <button 
+              className="p-2 rounded-button hover:bg-primary/10 transition-colors dark:text-white text-light-text-primary"
               onClick={() => setIsSettingsOpen(true)}
               aria-label="设置"
             >

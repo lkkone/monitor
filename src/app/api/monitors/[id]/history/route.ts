@@ -6,7 +6,7 @@ import { buildAuthOptions } from '@/app/api/auth/[...nextauth]/route';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 验证用户是否已登录
@@ -24,7 +24,8 @@ export async function GET(
     }
 
     // 获取监控ID参数
-    const monitorId = params.id;
+    const { id } = await params;
+    const monitorId = id;
 
     // 验证用户是否有权限访问该监控项
     const monitor = await prisma.monitor.findUnique({

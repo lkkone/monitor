@@ -242,6 +242,53 @@ const DB_VERSIONS = [
         `);
       }
     }
+  },
+  {
+    version: 8,
+    name: '状态页功能表',
+    requiredTables: ['StatusPage', 'StatusPageMonitor'],
+    check: async () => {
+      return await hasTable('StatusPage') && await hasTable('StatusPageMonitor');
+    },
+    upgrade: async () => {
+      // 创建StatusPage表
+      if (!await hasTable('StatusPage')) {
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE "StatusPage" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "name" TEXT NOT NULL,
+            "slug" TEXT NOT NULL,
+            "title" TEXT NOT NULL,
+            "isPublic" BOOLEAN NOT NULL DEFAULT true,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" DATETIME NOT NULL,
+            "createdById" TEXT,
+            CONSTRAINT "StatusPage_slug_key" UNIQUE ("slug"),
+            CONSTRAINT "StatusPage_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+          );
+          
+          CREATE INDEX "StatusPage_slug_idx" ON "StatusPage"("slug");
+        `);
+      }
+
+      // 创建StatusPageMonitor表
+      if (!await hasTable('StatusPageMonitor')) {
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE "StatusPageMonitor" (
+            "statusPageId" TEXT NOT NULL,
+            "monitorId" TEXT NOT NULL,
+            "displayName" TEXT,
+            "order" INTEGER NOT NULL DEFAULT 0,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "StatusPageMonitor_statusPageId_monitorId_pkey" PRIMARY KEY ("statusPageId", "monitorId"),
+            CONSTRAINT "StatusPageMonitor_statusPageId_fkey" FOREIGN KEY ("statusPageId") REFERENCES "StatusPage" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT "StatusPageMonitor_monitorId_fkey" FOREIGN KEY ("monitorId") REFERENCES "Monitor" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+          );
+          
+          CREATE INDEX "StatusPageMonitor_statusPageId_order_idx" ON "StatusPageMonitor"("statusPageId", "order");
+        `);
+      }
+    }
   }
 ];
 
