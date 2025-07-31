@@ -58,9 +58,13 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { monitorId, displayName } = body;
+    const { monitorIds, displayNames, monitorId, displayName } = body;
 
-    if (!monitorId) {
+    // 支持单个监控项和批量添加
+    const monitorIdList = Array.isArray(monitorIds) ? monitorIds : (monitorId ? [monitorId] : []);
+    const displayNameMap = displayNames || (displayName && monitorId ? { [monitorId]: displayName } : {});
+
+    if (monitorIdList.length === 0) {
       return NextResponse.json({ error: '缺少监控项ID' }, { status: 400 });
     }
 
@@ -76,27 +80,30 @@ export async function POST(
       return NextResponse.json({ error: '状态页不存在' }, { status: 404 });
     }
 
-    // 检查监控项是否存在
-    const monitor = await prisma.monitor.findUnique({
-      where: { id: monitorId }
-    });
-
-    if (!monitor) {
-      return NextResponse.json({ error: '监控项不存在' }, { status: 404 });
-    }
-
-    // 检查是否已经添加到状态页
-    const existingMonitor = await prisma.statusPageMonitor.findUnique({
+    // 检查所有监控项是否存在
+    const monitors = await prisma.monitor.findMany({
       where: {
-        statusPageId_monitorId: {
-          statusPageId: id,
-          monitorId
-        }
+        id: { in: monitorIdList }
       }
     });
 
-    if (existingMonitor) {
-      return NextResponse.json({ error: '监控项已添加到状态页' }, { status: 400 });
+    if (monitors.length !== monitorIdList.length) {
+      return NextResponse.json({ error: '部分监控项不存在' }, { status: 404 });
+    }
+
+    // 检查哪些监控项已经添加到状态页
+    const existingMonitors = await prisma.statusPageMonitor.findMany({
+      where: {
+        statusPageId: id,
+        monitorId: { in: monitorIdList }
+      }
+    });
+
+    const existingMonitorIds = existingMonitors.map(em => em.monitorId);
+    const newMonitorIds = monitorIdList.filter(id => !existingMonitorIds.includes(id));
+
+    if (newMonitorIds.length === 0) {
+      return NextResponse.json({ error: '所有监控项已添加到状态页' }, { status: 400 });
     }
 
     // 获取当前最大排序值
@@ -105,21 +112,26 @@ export async function POST(
       _max: { order: true }
     });
 
-    const newOrder = (maxOrder._max.order || 0) + 1;
+    let currentOrder = (maxOrder._max.order || 0) + 1;
 
-    const statusPageMonitor = await prisma.statusPageMonitor.create({
-      data: {
-        statusPageId: id,
-        monitorId,
-        displayName,
-        order: newOrder
-      },
-      include: {
-        monitor: true
-      }
-    });
+    // 批量创建状态页监控项
+    const statusPageMonitors = await Promise.all(
+      newMonitorIds.map(async (monitorId) => {
+        return await prisma.statusPageMonitor.create({
+          data: {
+            statusPageId: id,
+            monitorId,
+            displayName: displayNameMap[monitorId] || null,
+            order: currentOrder++
+          },
+          include: {
+            monitor: true
+          }
+        });
+      })
+    );
 
-    return NextResponse.json(statusPageMonitor, { status: 201 });
+    return NextResponse.json(statusPageMonitors, { status: 201 });
   } catch (error) {
     console.error('添加监控项到状态页失败:', error);
     return NextResponse.json({ error: '添加监控项到状态页失败' }, { status: 500 });

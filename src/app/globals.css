@@ -45,6 +45,53 @@ body {
   color: var(--dark-text-primary);
 }
 
+/* 亮色主题下的文字颜色修复 */
+.text-foreground {
+  color: var(--light-text-primary);
+}
+
+.dark .text-foreground {
+  color: var(--dark-text-primary);
+}
+
+.text-foreground\/60 {
+  color: rgba(17, 24, 39, 0.6);
+}
+
+.dark .text-foreground\/60 {
+  color: rgba(241, 245, 249, 0.6);
+}
+
+.text-foreground\/80 {
+  color: rgba(17, 24, 39, 0.8);
+}
+
+.dark .text-foreground\/80 {
+  color: rgba(241, 245, 249, 0.8);
+}
+
+/* 亮色主题下的背景色修复 */
+.bg-light-card {
+  background-color: var(--light-card);
+}
+
+.bg-light-nav {
+  background-color: var(--light-nav);
+}
+
+.bg-light-input {
+  background-color: var(--light-input);
+}
+
+/* 亮色主题下的边框色修复 */
+.border-primary\/10 {
+  border-color: rgba(99, 102, 241, 0.1);
+}
+
+.border-primary\/20 {
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
 /* Tailwind样式替代 */
 .bg-primary\/5 { background-color: rgba(99, 102, 241, 0.05); }
 .bg-primary\/10 { background-color: rgba(99, 102, 241, 0.1); }
@@ -54,9 +101,7 @@ body {
 .text-success { color: var(--success); }
 .text-warning { color: var(--warning); }
 .text-error { color: var(--error); }
-.border-primary\/10 { border-color: rgba(99, 102, 241, 0.1); }
 .border-primary\/15 { border-color: rgba(99, 102, 241, 0.15); }
-.border-primary\/20 { border-color: rgba(99, 102, 241, 0.2); }
 .border-primary\/25 { border-color: rgba(99, 102, 241, 0.25); }
 .border-primary\/30 { border-color: rgba(99, 102, 241, 0.3); }
 

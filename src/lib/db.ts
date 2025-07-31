@@ -55,7 +55,7 @@ export const monitorOperations = {
   },
 
   // 获取所有监控项
-  async getAllMonitors(orderBy = { createdAt: 'desc' } as Prisma.MonitorOrderByWithRelationInput) {
+  async getAllMonitors(orderBy = [{ displayOrder: 'asc' }, { createdAt: 'desc' }] as Prisma.MonitorOrderByWithRelationInput[]) {
     return prisma.monitor.findMany({
       orderBy,
       include: {
@@ -245,5 +245,32 @@ export const monitorOperations = {
 
       return bindings;
     });
+  },
+
+  // 更新监控项排序
+  async updateMonitorOrder(id: string, displayOrder: number) {
+    return prisma.monitor.update({
+      where: { id },
+      data: { displayOrder },
+      include: {
+        notificationBindings: {
+          include: {
+            notificationChannel: true
+          }
+        }
+      }
+    });
+  },
+
+  // 批量更新监控项排序
+  async updateMonitorsOrder(updates: Array<{ id: string; displayOrder: number }>) {
+    const transactions = updates.map(update => 
+      prisma.monitor.update({
+        where: { id: update.id },
+        data: { displayOrder: update.displayOrder }
+      })
+    );
+    
+    return prisma.$transaction(transactions);
   }
 }; 

@@ -8,18 +8,18 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  username  String    @unique
-  name      String?
-  email     String?
-  password  String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  isAdmin   Boolean   @default(false)
-  monitors  Monitor[]
-  sessions  Session[]
+  id           String        @id @default(cuid())
+  username     String        @unique
+  name         String?
+  email        String?
+  password     String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  isAdmin      Boolean       @default(false)
   loginRecords LoginRecord[]
-  statusPages StatusPage[]
+  monitors     Monitor[]
+  sessions     Session[]
+  statusPages  StatusPage[]
 }
 
 model Session {
@@ -61,6 +61,7 @@ model Monitor {
   resendInterval       Int                   @default(0)
   upsideDown           Boolean               @default(false)
   description          String?
+  displayOrder         Int?                 // 显示顺序，可选字段确保向后兼容
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   createdById          String?
@@ -101,23 +102,23 @@ model MonitorStatus {
 }
 
 model LoginRecord {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   userId    String
   ipAddress String?
   userAgent String?
-  success   Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  success   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
 }
 
 model StatusPage {
   id          String              @id @default(cuid())
-  name        String              // 状态页名称
-  slug        String              @unique // URL标识符
-  title       String              // 页面标题
-  isPublic    Boolean             @default(true) // 是否公开
+  name        String
+  slug        String              @unique
+  title       String
+  isPublic    Boolean             @default(true)
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
   createdById String?
@@ -130,11 +131,11 @@ model StatusPage {
 model StatusPageMonitor {
   statusPageId String
   monitorId    String
-  displayName  String?    // 自定义显示名称
-  order        Int        @default(0) // 显示顺序
+  displayName  String?
+  order        Int        @default(0)
   createdAt    DateTime   @default(now())
-  statusPage   StatusPage @relation(fields: [statusPageId], references: [id], onDelete: Cascade)
   monitor      Monitor    @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  statusPage   StatusPage @relation(fields: [statusPageId], references: [id], onDelete: Cascade)
 
   @@id([statusPageId, monitorId])
   @@index([statusPageId, order])

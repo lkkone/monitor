@@ -45,9 +45,9 @@ export function StatusPageForm({ statusPage, onClose, onSuccess }: StatusPageFor
   // 监控项管理状态
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [statusPageMonitors, setStatusPageMonitors] = useState<StatusPageMonitor[]>([]);
-  const [selectedMonitorId, setSelectedMonitorId] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [addingMonitor, setAddingMonitor] = useState(false);
+  const [selectedMonitorIds, setSelectedMonitorIds] = useState<string[]>([]);
+  const [displayNames, setDisplayNames] = useState<Record<string, string>>({});
+  const [addingMonitors, setAddingMonitors] = useState(false);
 
   useEffect(() => {
     if (statusPage) {
@@ -101,14 +101,14 @@ export function StatusPageForm({ statusPage, onClose, onSuccess }: StatusPageFor
 
   // 添加监控项到状态页
   const addMonitorToStatusPage = async () => {
-    if (!selectedMonitorId) return;
+    if (selectedMonitorIds.length === 0) return;
 
-    const selectedMonitor = monitors.find(m => m.id === selectedMonitorId);
-    if (!selectedMonitor) return;
+    const selectedMonitors = monitors.filter(m => selectedMonitorIds.includes(m.id));
+    if (selectedMonitors.length === 0) return;
 
     if (statusPage) {
       // 编辑模式：直接添加到数据库
-      setAddingMonitor(true);
+      setAddingMonitors(true);
       try {
         const response = await fetch(`/api/status-pages/${statusPage.id}/monitors`, {
           method: 'POST',
@@ -116,15 +116,15 @@ export function StatusPageForm({ statusPage, onClose, onSuccess }: StatusPageFor
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            monitorId: selectedMonitorId,
-            displayName: displayName.trim() || undefined
+            monitorIds: selectedMonitorIds,
+            displayNames: displayNames
           })
         });
 
         if (response.ok) {
           await fetchStatusPageMonitors();
-          setSelectedMonitorId('');
-          setDisplayName('');
+          setSelectedMonitorIds([]);
+          setDisplayNames({});
         } else {
           const error = await response.json();
           alert(`添加监控项失败: ${error.error}`);
@@ -133,17 +133,17 @@ export function StatusPageForm({ statusPage, onClose, onSuccess }: StatusPageFor
         console.error('添加监控项失败:', error);
         alert('添加监控项失败');
       } finally {
-        setAddingMonitor(false);
+        setAddingMonitors(false);
       }
     } else {
       // 创建模式：临时存储
-      setPendingMonitors(prev => [...prev, {
-        monitorId: selectedMonitorId,
-        displayName: displayName.trim() || undefined,
-        monitor: selectedMonitor
-      }]);
-      setSelectedMonitorId('');
-      setDisplayName('');
+      setPendingMonitors(prev => [...prev, ...selectedMonitors.map(m => ({
+        monitorId: m.id,
+        displayName: displayNames[m.id] || undefined,
+        monitor: m
+      }))]);
+      setSelectedMonitorIds([]);
+      setDisplayNames({});
     }
   };
 
@@ -265,8 +265,10 @@ export function StatusPageForm({ statusPage, onClose, onSuccess }: StatusPageFor
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                  monitorId: pendingMonitor.monitorId,
-                  displayName: pendingMonitor.displayName
+                  monitorIds: [pendingMonitor.monitorId],
+                  displayNames: {
+                    [pendingMonitor.monitorId]: pendingMonitor.displayName
+                  }
                 })
               });
             } catch (error) {
@@ -409,42 +411,88 @@ export function StatusPageForm({ statusPage, onClose, onSuccess }: StatusPageFor
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">
-                        选择监控项
+                        选择监控项（可多选）
                       </label>
-                      <select
-                        value={selectedMonitorId}
-                        onChange={(e) => setSelectedMonitorId(e.target.value)}
-                        className="w-full px-3 py-2 border border-primary/20 rounded-lg dark:bg-dark-nav bg-light-nav text-foreground focus:border-primary focus:outline-none"
-                      >
-                        <option value="" className="text-foreground">请选择监控项</option>
+                      <div className="h-64 overflow-y-auto border border-primary/20 rounded-lg p-3 dark:bg-dark-nav bg-light-nav">
                         {availableMonitors.map((monitor) => (
-                          <option key={monitor.id} value={monitor.id} className="text-foreground">
-                            {monitor.name} ({getMonitorTypeName(monitor.type)})
-                          </option>
+                          <label key={monitor.id} className="flex items-center space-x-3 p-2 hover:bg-primary/5 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedMonitorIds.includes(monitor.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedMonitorIds(prev => [...prev, monitor.id]);
+                                } else {
+                                  setSelectedMonitorIds(prev => prev.filter(id => id !== monitor.id));
+                                  setDisplayNames(prev => {
+                                    const newNames = { ...prev };
+                                    delete newNames[monitor.id];
+                                    return newNames;
+                                  });
+                                }
+                              }}
+                              className="text-primary focus:ring-primary"
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium text-foreground">
+                                {monitor.name}
+                              </div>
+                              <div className="text-sm text-foreground/60">
+                                {getMonitorDisplayInfo(monitor)}
+                              </div>
+                              <div className="text-xs text-foreground/40">
+                                {getMonitorTypeName(monitor.type)}
+                              </div>
+                            </div>
+                          </label>
                         ))}
-                      </select>
+                      </div>
+                      {selectedMonitorIds.length > 0 && (
+                        <p className="text-sm text-foreground/60 mt-2">
+                          已选择 {selectedMonitorIds.length} 个监控项
+                        </p>
+                      )}
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        显示名称（可选）
-                      </label>
-                      <input
-                        type="text"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        placeholder="留空则使用原名称"
-                        className="w-full px-3 py-2 border border-primary/20 rounded-lg dark:bg-dark-nav bg-light-nav text-foreground focus:border-primary focus:outline-none"
-                      />
-                    </div>
+                    {selectedMonitorIds.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          自定义显示名称（可选）
+                        </label>
+                        <div className="space-y-2">
+                          {selectedMonitorIds.map((monitorId) => {
+                            const monitor = monitors.find(m => m.id === monitorId);
+                            if (!monitor) return null;
+                            
+                            return (
+                              <div key={monitorId} className="flex items-center space-x-3">
+                                <span className="text-sm text-foreground/60 min-w-0 flex-1 truncate">
+                                  {monitor.name}:
+                                </span>
+                                <input
+                                  type="text"
+                                  value={displayNames[monitorId] || ''}
+                                  onChange={(e) => setDisplayNames(prev => ({
+                                    ...prev,
+                                    [monitorId]: e.target.value
+                                  }))}
+                                  placeholder="留空则使用原名称"
+                                  className="flex-1 px-3 py-1 text-sm border border-primary/20 rounded dark:bg-dark-nav bg-light-nav text-foreground focus:border-primary focus:outline-none"
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <button
                       type="button"
                       onClick={addMonitorToStatusPage}
-                      disabled={!selectedMonitorId || addingMonitor}
+                      disabled={selectedMonitorIds.length === 0 || addingMonitors}
                       className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                      {addingMonitor ? '添加中...' : '添加监控项'}
+                      {addingMonitors ? '添加中...' : `添加 ${selectedMonitorIds.length} 个监控项`}
                     </button>
                   </div>
                 )}
@@ -457,7 +505,7 @@ export function StatusPageForm({ statusPage, onClose, onSuccess }: StatusPageFor
                 {allMonitors.length === 0 ? (
                   <p className="text-foreground/60">还没有添加任何监控项</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="h-48 overflow-y-auto space-y-3">
                     {allMonitors.map((spm, index) => (
                       <div
                         key={spm.monitorId}

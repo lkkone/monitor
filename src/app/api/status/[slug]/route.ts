@@ -58,6 +58,44 @@ export async function GET(
     const pausedCount = monitors.filter(m => !m.active).length;
     const unknownCount = totalMonitors - normalCount - errorCount - pausedCount;
 
+    // 计算24小时成功率
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    const uptimeData = await Promise.all(
+      monitors.map(async (monitor) => {
+        if (!monitor.active) return { uptime: 0, totalChecks: 0 };
+        
+        // 获取24小时内的检查记录
+        const checks = await prisma.monitorStatus.findMany({
+          where: {
+            monitorId: monitor.id,
+            timestamp: {
+              gte: twentyFourHoursAgo
+            }
+          },
+          select: {
+            status: true
+          }
+        });
+        
+        if (checks.length === 0) return { uptime: 0, totalChecks: 0 };
+        
+        const successfulChecks = checks.filter(check => check.status === 1).length;
+        const uptime = (successfulChecks / checks.length) * 100;
+        
+        return { uptime, totalChecks: checks.length };
+      })
+    );
+    
+    // 计算总体成功率
+    const totalChecks = uptimeData.reduce((sum, data) => sum + data.totalChecks, 0);
+    const totalSuccessfulChecks = uptimeData.reduce((sum, data) => {
+      return sum + Math.round((data.uptime / 100) * data.totalChecks);
+    }, 0);
+    
+    const overallUptime = totalChecks > 0 ? (totalSuccessfulChecks / totalChecks) * 100 : 0;
+
     const statusData = {
       id: statusPage.id,
       name: statusPage.name,
@@ -69,7 +107,8 @@ export async function GET(
         normal: normalCount,
         error: errorCount,
         paused: pausedCount,
-        unknown: unknownCount
+        unknown: unknownCount,
+        uptime: Math.round(overallUptime * 100) / 100 // 保留两位小数
       },
       lastUpdated: new Date().toISOString()
     };

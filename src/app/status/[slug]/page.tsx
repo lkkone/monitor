@@ -25,6 +25,7 @@ interface StatusPageData {
     error: number;
     paused: number;
     unknown: number;
+    uptime: number;
   };
   lastUpdated: string;
 }
@@ -166,7 +167,7 @@ export default function StatusPage() {
         </div>
 
         {/* 统计信息 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <div className="dark:bg-dark-card bg-light-card rounded-lg border border-primary/10 p-6 text-center">
             <div className="text-3xl font-bold text-foreground mb-2">
               {statusData.statistics.total}
@@ -193,6 +194,13 @@ export default function StatusPage() {
               {statusData.statistics.paused}
             </div>
             <div className="text-sm text-foreground/60">暂停</div>
+          </div>
+          
+          <div className="dark:bg-dark-card bg-light-card rounded-lg border border-primary/10 p-6 text-center">
+            <div className="text-3xl font-bold text-primary mb-2">
+              {statusData.statistics.uptime}%
+            </div>
+            <div className="text-sm text-foreground/60">24小时可用性</div>
           </div>
         </div>
 
@@ -221,10 +229,6 @@ export default function StatusPage() {
               </div>
               
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-foreground/60">类型:</span>
-                  <span className="text-foreground/80">{monitor.type}</span>
-                </div>
                 <div className="flex justify-between">
                   <span className="text-foreground/60">最后检查:</span>
                   <span className="text-foreground/80">

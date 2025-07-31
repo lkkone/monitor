@@ -19,6 +19,7 @@ interface MonitorItemData {
   lastStatus?: number;
   lastCheckAt?: string;
   config?: Record<string, unknown>;
+  displayOrder?: number;
 }
 
 // 监控项状态映射
@@ -50,6 +51,9 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
   const [activeItems, setActiveItems] = useState<string[]>([]);
   const [monitors, setMonitors] = useState<MonitorItemData[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [dragStartIndex, setDragStartIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   
   // 添加滚动容器的引用
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -169,6 +173,78 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
     }
   };
 
+  // 开始拖拽
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDragStartIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  // 拖拽经过
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  // 拖拽结束
+  const handleDragEnd = () => {
+    if (dragStartIndex === null || dragOverIndex === null) {
+      setDragStartIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    if (dragStartIndex !== dragOverIndex) {
+      const newMonitors = [...monitors];
+      const [movedItem] = newMonitors.splice(dragStartIndex, 1);
+      newMonitors.splice(dragOverIndex, 0, movedItem);
+      
+      // 更新排序值
+      const updates = newMonitors.map((monitor, index) => ({
+        id: monitor.id,
+        displayOrder: index
+      }));
+
+      // 发送到服务器
+      updateMonitorOrder(updates);
+      setMonitors(newMonitors);
+    }
+
+    setDragStartIndex(null);
+    setDragOverIndex(null);
+  };
+
+  // 更新监控项排序
+  const updateMonitorOrder = async (updates: Array<{ id: string; displayOrder: number }>) => {
+    try {
+      const response = await fetch('/api/monitors/reorder', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ updates }),
+      });
+
+      if (!response.ok) {
+        console.error('更新排序失败');
+        // 重新获取数据
+        const fetchResponse = await fetch('/api/monitors');
+        if (fetchResponse.ok) {
+          const data = await fetchResponse.json();
+          setMonitors(data);
+        }
+      }
+    } catch (error) {
+      console.error('更新排序失败:', error);
+      // 重新获取数据
+      const fetchResponse = await fetch('/api/monitors');
+      if (fetchResponse.ok) {
+        const data = await fetchResponse.json();
+        setMonitors(data);
+      }
+    }
+  };
+
   return (
     <nav className="fixed left-0 top-0 bottom-0 w-80 dark:bg-dark-card bg-light-card border-r border-primary/10">
       <div className="p-5">
@@ -197,7 +273,9 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
           />
           <i className="fas fa-search absolute right-4 top-1/2 -translate-y-1/2 text-foreground/50"></i>
         </div>
-        <div className="text-sm text-foreground/50 px-4 mb-3">监控列表</div>
+        <div className="px-4 mb-3">
+          <span className="text-sm text-foreground/50">监控列表</span>
+        </div>
         <div 
           ref={scrollContainerRef}
           className="space-y-2.5 overflow-y-auto max-h-[calc(100vh-250px)] pr-1"
@@ -212,21 +290,37 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
               未找到监控项
             </div>
           ) : (
-            filteredItems.map(item => {
+            filteredItems.map((item, index) => {
               const status = statusMapping(item.lastStatus, item.active);
+              const isDragging = dragStartIndex === index;
+              const isDragOver = dragOverIndex === index;
+              
               return (
-                <button 
+                <div
                   key={item.id}
-                  data-monitor-id={item.id}
-                  onClick={() => handleMonitorClick(item.id)}
-                  className={`flex items-center px-4 py-3 rounded-lg w-full text-left ${
-                    activeItems.includes(item.id) ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground/90"
+                  draggable={true}
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragEnd={handleDragEnd}
+                  className={`${
+                    isDragging ? 'opacity-50' : ''
+                  } ${
+                    isDragOver ? 'border-t-2 border-primary' : ''
                   }`}
                 >
-                  <i className={`${getIconForType(item.type)} w-6 h-6 mr-3.5 flex items-center justify-center flex-shrink-0`}></i>
-                  <span className="flex-grow truncate mr-3.5 font-medium">{item.name}</span>
-                  <div className={`w-3 h-3 rounded-full ${getStatusDotClass(status)} flex-shrink-0`}></div>
-                </button>
+                  <button 
+                    data-monitor-id={item.id}
+                    onClick={() => handleMonitorClick(item.id)}
+                    className={`flex items-center px-4 py-3 rounded-lg w-full text-left ${
+                      activeItems.includes(item.id) ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground/90"
+                    } cursor-grab active:cursor-grabbing`}
+                  >
+                    
+                    <i className={`${getIconForType(item.type)} w-6 h-6 mr-3.5 flex items-center justify-center flex-shrink-0`}></i>
+                    <span className="flex-grow truncate mr-3.5 font-medium">{item.name}</span>
+                    <div className={`w-3 h-3 rounded-full ${getStatusDotClass(status)} flex-shrink-0`}></div>
+                  </button>
+                </div>
               );
             })
           )}

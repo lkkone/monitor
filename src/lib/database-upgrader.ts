@@ -289,6 +289,34 @@ const DB_VERSIONS = [
         `);
       }
     }
+  },
+  {
+    version: 9,
+    name: '监控项排序功能',
+    requiredTables: ['Monitor'],
+    check: async () => {
+      return await hasColumn('Monitor', 'displayOrder');
+    },
+    upgrade: async () => {
+      // 检查displayOrder列是否存在
+      if (!await hasColumn('Monitor', 'displayOrder')) {
+        // 添加displayOrder列，默认值为NULL（可选字段）
+        await prisma.$executeRawUnsafe(`
+          ALTER TABLE "Monitor" ADD COLUMN "displayOrder" INTEGER;
+        `);
+        
+        // 为现有监控项设置默认排序值（按创建时间倒序）
+        await prisma.$executeRawUnsafe(`
+          UPDATE "Monitor" 
+          SET "displayOrder" = (
+            SELECT COUNT(*) 
+            FROM "Monitor" AS m2 
+            WHERE m2."createdAt" >= "Monitor"."createdAt"
+          ) - 1
+          WHERE "displayOrder" IS NULL;
+        `);
+      }
+    }
   }
 ];
 
@@ -359,9 +387,9 @@ async function hasTable(tableName: string): Promise<boolean> {
 // 检查列是否存在
 async function hasColumn(tableName: string, columnName: string): Promise<boolean> {
   try {
-    const result = await prisma.$queryRaw<{name: string}[]>`
-      PRAGMA table_info(${tableName})
-    `;
+    const result = await prisma.$queryRawUnsafe<{name: string}[]>(
+      `PRAGMA table_info("${tableName}")`
+    );
     return result.some(col => col.name === columnName);
   } catch (error) {
     console.error(`检查表 ${tableName} 的列 ${columnName} 是否存在失败:`, error);
@@ -372,9 +400,9 @@ async function hasColumn(tableName: string, columnName: string): Promise<boolean
 // 检查列是否为必需的
 async function isColumnRequired(tableName: string, columnName: string): Promise<boolean> {
   try {
-    const result = await prisma.$queryRaw<{name: string, notnull: number}[]>`
-      PRAGMA table_info(${tableName})
-    `;
+    const result = await prisma.$queryRawUnsafe<{name: string, notnull: number}[]>(
+      `PRAGMA table_info("${tableName}")`
+    );
     const column = result.find(col => col.name === columnName);
     return column ? column.notnull === 1 : false;
   } catch (error) {
