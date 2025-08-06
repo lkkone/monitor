@@ -17,8 +17,131 @@ interface BasicInfoSectionProps {
   setPort: Dispatch<SetStateAction<string>>;
   keyword: string;
   setKeyword: Dispatch<SetStateAction<string>>;
+  groupId?: string | null;
+  setGroupId?: Dispatch<SetStateAction<string | null>>;
   config?: MonitorConfig;
   onConfigChange?: (key: string, value: string | number | boolean) => void;
+}
+
+// 新建分组对话框组件
+function CreateGroupDialog({ 
+  isOpen, 
+  onClose, 
+  onGroupCreated 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onGroupCreated: (groupId: string) => void; 
+}) {
+  const [groupName, setGroupName] = useState('');
+  const [description, setDescription] = useState('');
+  const [color, setColor] = useState('#6366F1');
+  const [isCreating, setIsCreating] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!groupName.trim()) {
+      toast.error('请输入分组名称');
+      return;
+    }
+
+    try {
+      setIsCreating(true);
+      const response = await fetch('/api/monitor-groups', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: groupName.trim(),
+          description: description.trim() || null,
+          color: color,
+        }),
+      });
+
+      if (response.ok) {
+        const newGroup = await response.json();
+        toast.success('分组创建成功');
+        onGroupCreated(newGroup.id);
+        onClose();
+        setGroupName('');
+        setDescription('');
+        setColor('#6366F1');
+      } else {
+        const error = await response.json();
+        toast.error(error.message || '创建分组失败');
+      }
+    } catch (error) {
+      console.error('创建分组失败:', error);
+      toast.error('创建分组失败');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-card border border-primary/20 rounded-lg p-6 w-full max-w-md mx-4">
+        <h3 className="text-lg font-medium mb-4 text-primary">新建分组</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-foreground/80 font-medium mb-2">分组名称 *</label>
+            <input
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder="请输入分组名称"
+              className="w-full px-4 py-2 rounded-lg dark:bg-dark-input bg-light-input border border-primary/20 focus:border-primary focus:outline-none"
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block text-foreground/80 font-medium mb-2">描述</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="可选的分组描述"
+              rows={3}
+              className="w-full px-4 py-2 rounded-lg dark:bg-dark-input bg-light-input border border-primary/20 focus:border-primary focus:outline-none"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-foreground/80 font-medium mb-2">颜色</label>
+            <div className="flex items-center space-x-2">
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="w-12 h-10 rounded border border-primary/20"
+              />
+              <span className="text-sm text-foreground/60">选择分组显示颜色</span>
+            </div>
+          </div>
+          
+          <div className="flex space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-primary/30 text-primary rounded-lg hover:bg-primary/5 transition-colors"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isCreating || !groupName.trim()}
+              className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isCreating ? '创建中...' : '创建分组'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function BasicInfoSection({
@@ -34,6 +157,8 @@ export function BasicInfoSection({
   setPort,
   keyword,
   setKeyword,
+  groupId,
+  setGroupId,
   config = {},
   onConfigChange
 }: BasicInfoSectionProps) {
@@ -78,6 +203,39 @@ export function BasicInfoSection({
     setPushToken(newToken);
   };
 
+  // 分组相关状态
+  const [groups, setGroups] = useState<Array<{ id: string; name: string; color?: string }>>([]);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+
+  // 获取分组列表
+  const fetchGroups = async () => {
+    try {
+      setIsLoadingGroups(true);
+      const response = await fetch('/api/monitor-groups');
+      if (response.ok) {
+        const data = await response.json();
+        setGroups(data);
+      }
+    } catch (error) {
+      console.error('获取分组失败:', error);
+    } finally {
+      setIsLoadingGroups(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchGroups();
+  }, []);
+
+  // 处理新建分组成功
+  const handleGroupCreated = (newGroupId: string) => {
+    // 刷新分组列表
+    fetchGroups();
+    // 自动选择新创建的分组
+    setGroupId?.(newGroupId);
+  };
+
   return (
     <div className="p-5 border border-primary/10 rounded-lg">
       <h3 className="text-lg font-medium mb-4 text-primary">基本信息</h3>
@@ -96,6 +254,40 @@ export function BasicInfoSection({
             className="w-full px-4 py-2 rounded-lg dark:bg-dark-input bg-light-input border border-primary/20 focus:border-primary focus:outline-none"
             required
           />
+        </div>
+
+        {/* 分组选择 */}
+        <div className="space-y-2">
+          <label className="block text-foreground/80 font-medium">分组</label>
+          <div className="flex space-x-2">
+            <select
+              value={groupId || ''}
+              onChange={(e) => setGroupId?.(e.target.value || null)}
+              className="flex-1 px-4 py-2 rounded-lg dark:bg-dark-input bg-light-input border border-primary/20 focus:border-primary focus:outline-none"
+            >
+              <option value="">无分组</option>
+              {isLoadingGroups ? (
+                <option disabled>加载中...</option>
+              ) : (
+                groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))
+              )}
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowCreateDialog(true)}
+              className="px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg border border-primary/20 transition-colors"
+              title="新建分组"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -238,6 +430,11 @@ export function BasicInfoSection({
           </p>
         </div>
       )}
+      <CreateGroupDialog
+        isOpen={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onGroupCreated={handleGroupCreated}
+      />
     </div>
   );
 }

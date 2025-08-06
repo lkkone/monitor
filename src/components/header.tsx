@@ -57,6 +57,20 @@ export function Header() {
     };
   }, []);
 
+  // 处理设置对话框关闭后的刷新
+  const handleSettingsClose = () => {
+    setIsSettingsOpen(false);
+  };
+
+  // 处理设置对话框关闭并刷新
+  const handleSettingsCloseWithRefresh = () => {
+    setIsSettingsOpen(false);
+    // 延迟刷新，确保对话框完全关闭后再刷新
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
+  };
+
   return (
     <>
       <nav className="glass-effect fixed top-0 left-80 right-0 h-16 border-b border-primary/10 z-50">
@@ -81,6 +95,8 @@ export function Header() {
             >
               <i className="fas fa-chart-line"></i>
             </button>
+            
+
             
             <button 
               className="p-2 rounded-button hover:bg-primary/10 transition-colors dark:text-white text-light-text-primary"
@@ -197,8 +213,8 @@ export function Header() {
         </div>
       </nav>
       
-      {/* 设置对话框 */}
-      <SettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+             {/* 设置对话框 */}
+       <SettingsDialog isOpen={isSettingsOpen} onClose={handleSettingsClose} onRefresh={handleSettingsCloseWithRefresh} />
     </>
   );
 } 

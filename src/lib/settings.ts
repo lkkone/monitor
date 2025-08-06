@@ -330,7 +330,7 @@ export async function updateNotificationChannel(
 // 辅助函数，检查NotificationChannel表是否已有defaultForNewMonitors列
 async function checkDefaultColumnExists(): Promise<boolean> {
   try {
-    const columns = await prisma.$queryRaw`PRAGMA table_info(NotificationChannel)`;
+    const columns = await prisma.$queryRawUnsafe<{name: string}[]>(`PRAGMA table_info("NotificationChannel")`);
     // 类型安全的检查
     if (Array.isArray(columns)) {
       return columns.some((col) => typeof col === 'object' && col !== null && 'name' in col && col.name === 'defaultForNewMonitors');

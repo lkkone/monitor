@@ -84,6 +84,7 @@ export async function POST(request: Request) {
       upsideDown: data.upsideDown || false,
       description: data.description || "",
       active: data.active !== false,
+      groupId: data.groupId || null,
       notificationBindings: data.notificationBindings || []
     };
     
@@ -130,7 +131,8 @@ export async function GET() {
       
       return {
         ...monitor,
-        notificationBindings
+        notificationBindings,
+        group: monitor.group || null
       };
     });
     

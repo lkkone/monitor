@@ -22,6 +22,7 @@ export const monitorOperations = {
     upsideDown: boolean;
     description: string;
     active: boolean;
+    groupId?: string | null;
     notificationBindings: SimpleNotificationBinding[];
   }) {
     const { notificationBindings, ...monitorData } = data;
@@ -63,6 +64,14 @@ export const monitorOperations = {
           include: {
             notificationChannel: true
           }
+        },
+        group: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            color: true
+          }
         }
       }
     });
@@ -82,6 +91,14 @@ export const monitorOperations = {
         notificationBindings: {
           include: {
             notificationChannel: true
+          }
+        },
+        group: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            color: true
           }
         }
       }

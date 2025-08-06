@@ -71,6 +71,33 @@ docker run -d --name coolmonitor --restart always -p 3333:3333 -v ~/coolmonitor_
 
 访问 http://localhost:3333 开始使用酷监控。
 
+## 🔄 更新说明
+
+### Docker部署更新
+
+如果您使用Docker部署，更新到最新版本需要执行以下步骤：
+
+```bash
+# 1. 停止当前运行的容器
+docker stop coolmonitor
+
+# 2. 删除旧容器（数据会保留在挂载的卷中）
+docker rm coolmonitor
+
+# 3. 拉取最新镜像
+docker pull star7th/coolmonitor:latest
+# 或者对于ARM架构
+docker pull star7th/coolmonitor:arm-latest
+
+# 4. 重新运行容器
+docker run -d --name coolmonitor --restart always -p 3333:3333 -v ~/coolmonitor_data:/app/data star7th/coolmonitor:latest
+```
+
+**注意事项：**
+- 更新过程中，你的监控数据和配置会保留在挂载的数据卷中
+- 建议在更新前备份重要数据
+- 更新后首次启动可能需要几秒或者几十秒时间进行数据库迁移
+
 ## 🧩 项目结构
 
 ```

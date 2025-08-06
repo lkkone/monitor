@@ -4,15 +4,17 @@ import { useState } from "react";
 import { SystemSettings } from "./settings/system-settings";
 import { NotificationSettings } from "./settings/notification-settings";
 import { AboutSettings } from "./settings/about-settings";
+import { MonitorGroupSettings } from "./settings/monitor-group-settings";
 
 interface SettingsDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  onRefresh?: () => void; // 添加刷新回调
 }
 
-type TabType = "系统设置" | "通知设置" | "关于";
+type TabType = "系统设置" | "通知设置" | "监控分组" | "关于";
 
-export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
+export function SettingsDialog({ isOpen, onClose, onRefresh }: SettingsDialogProps) {
   const [activeTab, setActiveTab] = useState<TabType>("系统设置");
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean | null>(null);
@@ -74,6 +76,13 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
       } else if (activeTab === "通知设置") {
         // 通知设置已经有自己的保存机制
         onClose(); // 关闭对话框
+      } else if (activeTab === "监控分组") {
+        // 监控分组设置已经有自己的保存机制
+        onClose(); // 关闭对话框
+        // 如果提供了刷新回调，调用它来刷新页面
+        if (onRefresh) {
+          onRefresh();
+        }
       }
     } catch (error) {
       console.error('保存设置失败:', error);
@@ -92,10 +101,18 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
         {/* 标题栏 */}
         <div className="flex justify-between items-center p-6 border-b border-primary/10">
           <h2 className="text-xl font-bold dark:text-foreground text-light-text-primary">设置</h2>
-          <button 
-            onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-primary/10 dark:text-foreground text-light-text-primary transition-colors flex items-center justify-center"
-          >
+                     <button 
+             onClick={() => {
+               onClose();
+                                // 如果当前是监控分组页面，调用刷新回调
+                 if (activeTab === "监控分组" && onRefresh) {
+                   setTimeout(() => {
+                     onRefresh();
+                   }, 100);
+                 }
+             }}
+             className="w-8 h-8 rounded-full hover:bg-primary/10 dark:text-foreground text-light-text-primary transition-colors flex items-center justify-center"
+           >
             <i className="fas fa-times"></i>
           </button>
         </div>
@@ -104,7 +121,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
           {/* 侧边标签栏 */}
           <div className="w-64 border-r border-primary/10 p-5 bg-dark-card/50 dark:bg-dark-card/50 bg-light-card/50">
             <nav className="space-y-2">
-              {(["系统设置", "通知设置", "关于"] as TabType[]).map((tab) => (
+              {(["系统设置", "通知设置", "监控分组", "关于"] as TabType[]).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -120,6 +137,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                     <i className={`fas fa-${
                       tab === "系统设置" ? "cogs" : 
                       tab === "通知设置" ? "bell" : 
+                      tab === "监控分组" ? "folder" :
                       "info-circle"
                     }`}></i>
                   </div>
@@ -133,6 +151,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
           <div className="flex-1 overflow-y-auto p-7">
             {activeTab === "系统设置" && <SystemSettings />}
             {activeTab === "通知设置" && <NotificationSettings />}
+            {activeTab === "监控分组" && <MonitorGroupSettings />}
             {activeTab === "关于" && <AboutSettings />}
           </div>
         </div>
@@ -140,14 +159,22 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
         {/* 底部操作栏 */}
         <div className="flex justify-end px-6 py-5 bg-dark-nav/50 dark:bg-dark-nav/50 bg-light-nav/50 border-t border-primary/10">
           <div className="flex space-x-3">
-            <button 
-              onClick={onClose}
-              className="px-5 py-2.5 bg-primary/5 text-primary rounded-lg hover:bg-primary/10 transition-all text-sm font-medium"
-            >
-              关闭
-            </button>
+                         <button 
+               onClick={() => {
+                 onClose();
+                 // 如果当前是监控分组页面，调用刷新回调
+                 if (activeTab === "监控分组" && onRefresh) {
+                   setTimeout(() => {
+                     onRefresh();
+                   }, 100);
+                 }
+               }}
+               className="px-5 py-2.5 bg-primary/5 text-primary rounded-lg hover:bg-primary/10 transition-all text-sm font-medium"
+             >
+               关闭
+             </button>
             
-            {activeTab !== "关于" && (
+            {activeTab !== "关于" && activeTab !== "监控分组" && (
               <button 
                 onClick={handleSaveSettings}
                 disabled={isSaving}

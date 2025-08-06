@@ -20,6 +20,12 @@ interface MonitorItemData {
   lastCheckAt?: string;
   config?: Record<string, unknown>;
   displayOrder?: number;
+  group?: {
+    id: string;
+    name: string;
+    description?: string;
+    color?: string;
+  } | null;
 }
 
 // 监控项状态映射
@@ -104,35 +110,122 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
     }
   }, [loading, activeMonitorId, monitors]);
   
-  const filteredItems = monitors.filter(item => {
-    // 名称匹配
-    if (item.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return true;
-    }
+  // 检查是否有任何监控项属于分组
+  const hasGroups = monitors.some(item => item.group);
+  
+  // 如果有分组，按分组组织；否则平铺展示
+  let displayData: Array<{ id: string; name: string; color: string; monitors: MonitorItemData[] }> = [];
+  
+  if (hasGroups) {
+    // 按分组组织监控项
+    const groupedMonitors = monitors.reduce((groups, item) => {
+      const groupId = item.group?.id || 'ungrouped';
+      const groupName = item.group?.name || '未分组';
+      const groupColor = item.group?.color || '#6366F1';
+      
+      if (!groups[groupId]) {
+        groups[groupId] = {
+          id: groupId,
+          name: groupName,
+          color: groupColor,
+          monitors: []
+        };
+      }
+      
+      groups[groupId].monitors.push(item);
+      return groups;
+    }, {} as Record<string, { id: string; name: string; color: string; monitors: MonitorItemData[] }>);
+
+    // 过滤分组和监控项
+    const filteredGroups = Object.values(groupedMonitors).map(group => {
+      const filteredMonitors = group.monitors.filter(item => {
+        // 名称匹配
+        if (item.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+          return true;
+        }
+        
+        // 分组名称匹配
+        if (item.group && item.group.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+          return true;
+        }
+        
+        // 尝试匹配配置中的URL、hostname或IP地址
+        if (item.config) {
+          const config = item.config as Record<string, unknown>;
+          
+          // 匹配URL
+          if (config.url && String(config.url).toLowerCase().includes(searchQuery.toLowerCase())) {
+            return true;
+          }
+          
+          // 匹配hostname
+          if (config.hostname && String(config.hostname).toLowerCase().includes(searchQuery.toLowerCase())) {
+            return true;
+          }
+          
+          // 匹配IP:端口组合
+          if (config.hostname && config.port && 
+              `${String(config.hostname)}:${String(config.port)}`.toLowerCase().includes(searchQuery.toLowerCase())) {
+            return true;
+          }
+        }
+        
+        return false;
+      });
+      
+      return {
+        ...group,
+        monitors: filteredMonitors
+      };
+    }).filter(group => group.monitors.length > 0);
+
+    // 按分组显示顺序排序
+    displayData = filteredGroups.sort((a, b) => {
+      // 未分组始终排在最后
+      if (a.id === 'ungrouped') return 1;
+      if (b.id === 'ungrouped') return -1;
+      return 0;
+    });
+  } else {
+    // 没有分组时，平铺展示所有监控项
+    const filteredMonitors = monitors.filter(item => {
+      // 名称匹配
+      if (item.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return true;
+      }
+      
+      // 尝试匹配配置中的URL、hostname或IP地址
+      if (item.config) {
+        const config = item.config as Record<string, unknown>;
+        
+        // 匹配URL
+        if (config.url && String(config.url).toLowerCase().includes(searchQuery.toLowerCase())) {
+          return true;
+        }
+        
+        // 匹配hostname
+        if (config.hostname && String(config.hostname).toLowerCase().includes(searchQuery.toLowerCase())) {
+          return true;
+        }
+        
+        // 匹配IP:端口组合
+        if (config.hostname && config.port && 
+            `${String(config.hostname)}:${String(config.port)}`.toLowerCase().includes(searchQuery.toLowerCase())) {
+          return true;
+        }
+      }
+      
+      return false;
+    });
     
-    // 尝试匹配配置中的URL、hostname或IP地址
-    if (item.config) {
-      const config = item.config as Record<string, unknown>;
-      
-      // 匹配URL
-      if (config.url && String(config.url).toLowerCase().includes(searchQuery.toLowerCase())) {
-        return true;
-      }
-      
-      // 匹配hostname
-      if (config.hostname && String(config.hostname).toLowerCase().includes(searchQuery.toLowerCase())) {
-        return true;
-      }
-      
-      // 匹配IP:端口组合
-      if (config.hostname && config.port && 
-          `${String(config.hostname)}:${String(config.port)}`.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return true;
-      }
-    }
-    
-    return false;
-  });
+    // 创建一个虚拟的"平铺"分组
+    displayData = [{
+      id: 'flat',
+      name: '',
+      color: '#6366F1',
+      monitors: filteredMonitors
+    }];
+  }
 
   const getIconForType = (type: string) => {
     switch(type) {
@@ -187,17 +280,27 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
   };
 
   // 拖拽结束
-  const handleDragEnd = () => {
+  const handleDragEnd = async () => {
     if (dragStartIndex === null || dragOverIndex === null) {
       setDragStartIndex(null);
       setDragOverIndex(null);
       return;
     }
 
-    if (dragStartIndex !== dragOverIndex) {
-      const newMonitors = [...monitors];
-      const [movedItem] = newMonitors.splice(dragStartIndex, 1);
-      newMonitors.splice(dragOverIndex, 0, movedItem);
+    // 由于现在有分组结构，拖拽逻辑需要重新设计
+    // 暂时禁用跨分组的拖拽，只允许在分组内重新排序
+    const startGroupIndex = Math.floor(dragStartIndex / 1000);
+    const endGroupIndex = Math.floor(dragOverIndex / 1000);
+    
+    if (startGroupIndex === endGroupIndex && dragStartIndex !== dragOverIndex) {
+      // 在同一分组内拖拽
+             const group = displayData[startGroupIndex];
+      const newMonitors = [...group.monitors];
+      const startItemIndex = dragStartIndex % 1000;
+      const endItemIndex = dragOverIndex % 1000;
+      
+      const [movedItem] = newMonitors.splice(startItemIndex, 1);
+      newMonitors.splice(endItemIndex, 0, movedItem);
       
       // 更新排序值
       const updates = newMonitors.map((monitor, index) => ({
@@ -207,7 +310,13 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
 
       // 发送到服务器
       updateMonitorOrder(updates);
-      setMonitors(newMonitors);
+      
+      // 重新获取数据以更新UI
+      const fetchResponse = await fetch('/api/monitors');
+      if (fetchResponse.ok) {
+        const data = await fetchResponse.json();
+        setMonitors(data);
+      }
     }
 
     setDragStartIndex(null);
@@ -278,51 +387,76 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
         </div>
         <div 
           ref={scrollContainerRef}
-          className="space-y-2.5 overflow-y-auto max-h-[calc(100vh-250px)] pr-1"
+          className="space-y-3 overflow-y-auto max-h-[calc(100vh-250px)] pr-1"
         >
           {loading ? (
             <div className="text-center py-4 text-foreground/60">
               <i className="fas fa-spinner fa-spin mr-2"></i>
               加载中...
             </div>
-          ) : filteredItems.length === 0 ? (
+          ) : displayData.length === 0 ? (
             <div className="text-center py-4 text-foreground/60">
               未找到监控项
             </div>
           ) : (
-            filteredItems.map((item, index) => {
-              const status = statusMapping(item.lastStatus, item.active);
-              const isDragging = dragStartIndex === index;
-              const isDragOver = dragOverIndex === index;
-              
-              return (
-                <div
-                  key={item.id}
-                  draggable={true}
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDragEnd={handleDragEnd}
-                  className={`${
-                    isDragging ? 'opacity-50' : ''
-                  } ${
-                    isDragOver ? 'border-t-2 border-primary' : ''
-                  }`}
-                >
-                  <button 
-                    data-monitor-id={item.id}
-                    onClick={() => handleMonitorClick(item.id)}
-                    className={`flex items-center px-4 py-3 rounded-lg w-full text-left ${
-                      activeItems.includes(item.id) ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground/90"
-                    } cursor-grab active:cursor-grabbing`}
-                  >
+                                      displayData.map((group, groupIndex) => (
+               <div key={group.id} className="space-y-2">
+                 {/* 分组标题 - 只在有分组时显示 */}
+                 {hasGroups && (
+                   <div className="flex items-center px-2 py-1">
+                     <div 
+                       className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
+                       style={{ backgroundColor: group.color }}
+                     ></div>
+                     <span className="text-sm font-medium text-foreground/70 truncate">
+                       {group.name}
+                     </span>
+                     <span className="ml-auto text-xs text-foreground/50">
+                       {group.monitors.length}
+                     </span>
+                   </div>
+                 )}
+                 
+                 {/* 分组下的监控项 */}
+                 <div className={`space-y-1 ${hasGroups ? 'ml-4' : ''}`}>
+                  {group.monitors.map((item, itemIndex) => {
+                    const status = statusMapping(item.lastStatus, item.active);
+                    const globalIndex = groupIndex * 1000 + itemIndex; // 用于拖拽的全局索引
+                    const isDragging = dragStartIndex === globalIndex;
+                    const isDragOver = dragOverIndex === globalIndex;
                     
-                    <i className={`${getIconForType(item.type)} w-6 h-6 mr-3.5 flex items-center justify-center flex-shrink-0`}></i>
-                    <span className="flex-grow truncate mr-3.5 font-medium">{item.name}</span>
-                    <div className={`w-3 h-3 rounded-full ${getStatusDotClass(status)} flex-shrink-0`}></div>
-                  </button>
+                    return (
+                      <div
+                        key={item.id}
+                        draggable={true}
+                        onDragStart={(e) => handleDragStart(e, globalIndex)}
+                        onDragOver={(e) => handleDragOver(e, globalIndex)}
+                        onDragEnd={handleDragEnd}
+                        className={`${
+                          isDragging ? 'opacity-50' : ''
+                        } ${
+                          isDragOver ? 'border-t-2 border-primary' : ''
+                        }`}
+                      >
+                                                 <button 
+                           data-monitor-id={item.id}
+                           onClick={() => handleMonitorClick(item.id)}
+                           className={`flex items-center ${hasGroups ? 'px-3 py-2.5' : 'px-4 py-3'} rounded-lg w-full text-left ${
+                             activeItems.includes(item.id) ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground/90"
+                           } cursor-grab active:cursor-grabbing`}
+                         >
+                           <i className={`${getIconForType(item.type)} ${hasGroups ? 'w-5 h-5 mr-3' : 'w-6 h-6 mr-3.5'} flex items-center justify-center flex-shrink-0`}></i>
+                           <div className="flex-grow min-w-0">
+                             <span className={`block truncate ${hasGroups ? 'text-sm' : ''} font-medium`}>{item.name}</span>
+                           </div>
+                           <div className={`${hasGroups ? 'w-2.5 h-2.5' : 'w-3 h-3'} rounded-full ${getStatusDotClass(status)} flex-shrink-0`}></div>
+                         </button>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })
+              </div>
+            ))
           )}
         </div>
       </div>

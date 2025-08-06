@@ -317,6 +317,44 @@ const DB_VERSIONS = [
         `);
       }
     }
+  },
+  {
+    version: 10,
+    name: '监控分组功能',
+    requiredTables: ['MonitorGroup'],
+    check: async () => {
+      return await hasTable('MonitorGroup') && await hasColumn('Monitor', 'groupId');
+    },
+    upgrade: async () => {
+      // 创建MonitorGroup表
+      if (!await hasTable('MonitorGroup')) {
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE "MonitorGroup" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "name" TEXT NOT NULL,
+            "description" TEXT,
+            "color" TEXT,
+            "displayOrder" INTEGER,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" DATETIME NOT NULL,
+            "createdById" TEXT,
+            CONSTRAINT "MonitorGroup_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+          );
+        `);
+      }
+
+      // 为Monitor表添加groupId列
+      if (!await hasColumn('Monitor', 'groupId')) {
+        await prisma.$executeRawUnsafe(`
+          ALTER TABLE "Monitor" ADD COLUMN "groupId" TEXT;
+        `);
+        
+        // 添加外键约束
+        await prisma.$executeRawUnsafe(`
+          CREATE INDEX "Monitor_groupId_idx" ON "Monitor"("groupId");
+        `);
+      }
+    }
   }
 ];
 

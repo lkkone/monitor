@@ -20,6 +20,7 @@ model User {
   monitors     Monitor[]
   sessions     Session[]
   statusPages  StatusPage[]
+  monitorGroups MonitorGroup[]
 }
 
 model Session {
@@ -39,14 +40,28 @@ model SystemConfig {
 }
 
 model NotificationChannel {
-  id                   String                @id @default(cuid())
-  name                 String
-  type                 String
-  enabled              Boolean               @default(true)
-  config               Json
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  monitorNotifications MonitorNotification[]
+  id                    String                @id @default(cuid())
+  name                  String
+  type                  String
+  enabled               Boolean               @default(true)
+  config                Json
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  defaultForNewMonitors Boolean?              @default(false)
+  monitorNotifications  MonitorNotification[]
+}
+
+model MonitorGroup {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  color       String?   // 分组颜色，用于UI显示
+  displayOrder Int?     // 显示顺序
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  createdBy   User?     @relation(fields: [createdById], references: [id])
+  monitors    Monitor[]
 }
 
 model Monitor {
@@ -61,14 +76,16 @@ model Monitor {
   resendInterval       Int                   @default(0)
   upsideDown           Boolean               @default(false)
   description          String?
-  displayOrder         Int?                 // 显示顺序，可选字段确保向后兼容
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   createdById          String?
   lastCheckAt          DateTime?
   nextCheckAt          DateTime?
   lastStatus           Int?
+  displayOrder         Int?
+  groupId              String?              // 分组ID，可选字段确保向后兼容
   createdBy            User?                 @relation(fields: [createdById], references: [id])
+  group                MonitorGroup?         @relation(fields: [groupId], references: [id])
   notificationBindings MonitorNotification[]
   statusHistory        MonitorStatus[]
   statusPages          StatusPageMonitor[]

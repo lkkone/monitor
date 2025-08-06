@@ -22,6 +22,7 @@ interface MonitorData {
   active?: boolean;
   upsideDown?: boolean;
   description?: string;
+  groupId?: string | null;
   createdAt?: string;
   updatedAt?: string;
   notificationBindings?: SimpleNotificationBinding[];
@@ -49,6 +50,7 @@ export function MonitorForm({ isOpen, onClose, editMode = false, initialData = n
   const [url, setUrl] = useState("");
   const [hostname, setHostname] = useState("");
   const [port, setPort] = useState("");
+  const [groupId, setGroupId] = useState<string | null>(null);
   
   // 监控设置
   const [interval, setInterval] = useState("60");
@@ -107,6 +109,7 @@ export function MonitorForm({ isOpen, onClose, editMode = false, initialData = n
       // 基本信息
       setMonitorType(initialData.type || "http");
       setName(initialData.name || "");
+      setGroupId(initialData.groupId || null);
       
       // 根据监控类型设置特定字段
       if (initialData.config) {
@@ -264,6 +267,7 @@ export function MonitorForm({ isOpen, onClose, editMode = false, initialData = n
       retryInterval: parseInt(retryInterval),
       resendInterval: parseInt(resendInterval),
       upsideDown,
+      groupId,
       notificationBindings
     };
     
@@ -392,6 +396,8 @@ export function MonitorForm({ isOpen, onClose, editMode = false, initialData = n
                   setPort={setPort}
                   keyword={keyword}
                   setKeyword={setKeyword}
+                  groupId={groupId}
+                  setGroupId={setGroupId}
                   config={initialData?.config as unknown as MonitorConfig || {}}
                   onConfigChange={(key, value) => {
                     // 这里不需要调用setConfig，因为在handleSubmit中已经正确构建了config对象
