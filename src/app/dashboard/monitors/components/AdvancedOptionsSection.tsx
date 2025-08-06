@@ -1,4 +1,5 @@
 import { Dispatch, SetStateAction } from "react";
+import { HttpAuthSection } from "./HttpAuthSection";
 
 interface AdvancedOptionsSectionProps {
   monitorType: string;
@@ -45,6 +46,15 @@ export function AdvancedOptionsSection({
 }: AdvancedOptionsSectionProps) {
   return (
     <div className="space-y-6">
+      {/* HTTP认证选项 */}
+      {(monitorType === "http" || monitorType === "keyword" || monitorType === "https-cert") && (
+        <HttpAuthSection
+          monitorType={monitorType}
+          requestHeaders={requestHeaders}
+          setRequestHeaders={setRequestHeaders}
+        />
+      )}
+      
       {/* HTTP选项 */}
       {(monitorType === "http" || monitorType === "keyword") && (
         <div className="p-5 border border-primary/10 rounded-lg">
@@ -118,13 +128,16 @@ export function AdvancedOptionsSection({
             
             {/* 请求头 */}
             <div className="space-y-2">
-              <label className="block text-foreground/80 font-medium">请求头</label>
+              <label className="block text-foreground/80 font-medium">自定义请求头</label>
               <textarea
                 value={requestHeaders}
                 onChange={(e) => setRequestHeaders(e.target.value)}
                 className="w-full px-4 py-2 rounded-lg dark:bg-dark-input bg-light-input border border-primary/20 focus:border-primary focus:outline-none h-24 font-mono text-sm"
-                placeholder={'例如：\n{\n  "HeaderName": "HeaderValue"\n}'}
+                placeholder={'例如：\n{\n  "X-Custom-Header": "custom-value",\n  "Content-Type": "application/json"\n}'}
               ></textarea>
+              <p className="text-xs text-foreground/50">
+                支持JSON格式的自定义请求头。HTTP认证请使用上方的"HTTP认证"功能。
+              </p>
             </div>
             
             {/* HTTPS证书到期通知选项 */}
