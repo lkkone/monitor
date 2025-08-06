@@ -38,6 +38,10 @@ interface EmailConfig {
 // Webhook配置接口
 interface WebhookConfig {
   url: string;
+  method?: string; // HTTP方法，默认POST
+  headers?: Record<string, string>; // 自定义请求头
+  bodyTemplate?: string; // 请求体模板，支持变量占位符
+  contentType?: string; // Content-Type，默认application/json
 }
 
 // 微信推送配置接口
@@ -333,7 +337,11 @@ async function sendNotification(
     case 'Webhook':
       // 转换并验证配置
       const webhookConfig: WebhookConfig = {
-        url: String(config.url || '')
+        url: String(config.url || ''),
+        method: config.method as string,
+        headers: config.headers as Record<string, string>,
+        bodyTemplate: config.bodyTemplate as string,
+        contentType: config.contentType as string
       };
       return await sendWebhookNotification(webhookConfig, data);
     case '微信推送':
@@ -434,12 +442,15 @@ async function sendWebhookNotification(
   config: WebhookConfig,
   data: NotificationData
 ) {
-  const { url } = config;
+  const { url, method = 'POST', headers, bodyTemplate, contentType = 'application/json' } = config;
   
   if (!url) {
     throw new Error('Webhook URL不能为空');
   }
-  
+
+  // 向后兼容性日志
+  console.log(`Webhook配置: URL=${url}, Method=${method}, ContentType=${contentType}, 自定义模板=${!!bodyTemplate}, 自定义请求头=${!!headers}`);
+
   // 准备webhook数据
   const webhookData = {
     event: 'status_change',
@@ -467,17 +478,61 @@ async function sendWebhookNotification(
   if (addressMatch && addressMatch[1]) {
     webhookData.monitor.address = addressMatch[1];
   }
+
+  // 处理请求体
+  let requestBody: string | Record<string, unknown>;
+  if (bodyTemplate) {
+    // 使用自定义模板，替换变量
+    let body = bodyTemplate;
+    Object.entries(data).forEach(([key, value]) => {
+      // 对变量值进行JSON转义，只转义真正的控制字符
+      const escapedValue = String(value)
+        .replace(/\\/g, '\\\\')  // 反斜杠
+        .replace(/"/g, '\\"')    // 双引号
+        .replace(/\n/g, '\\n')   // 换行符
+        .replace(/\r/g, '\\r')   // 回车符
+        .replace(/\t/g, '\\t');  // 制表符
+      // 移除其他控制字符的转义，避免过度转义
+      
+      body = body.replace(new RegExp(`\\{${key}\\}`, 'g'), escapedValue);
+    });
+    
+    // 根据Content-Type处理请求体
+    if (contentType === 'application/json') {
+      try {
+        requestBody = JSON.parse(body);
+      } catch (error) {
+        console.error('自定义JSON模板解析失败，使用原始字符串:', error);
+        console.error('原始模板:', body);
+        requestBody = body;
+      }
+    } else {
+      requestBody = body;
+    }
+  } else {
+    // 使用默认数据结构
+    requestBody = webhookData;
+  }
+
+  // 根据Content-Type设置请求头
+  const requestHeaders: Record<string, string> = {
+    'Content-Type': contentType,
+    'User-Agent': 'CoolMonitor-Notification-Service'
+  };
+  if (headers) {
+    Object.assign(requestHeaders, headers);
+  }
   
   console.log(`发送Webhook通知: URL=${url}, 监控项=${data.monitorName}, 状态=${data.statusText}`);
-  console.log(`Webhook数据: ${JSON.stringify(webhookData)}`);
+  console.log(`Webhook数据: ${JSON.stringify(requestBody)}`);
   
   try {
     // 发送webhook请求
-    const response = await axios.post(url, webhookData, {
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'CoolMonitor-Notification-Service'
-      },
+    const response = await axios({
+      url,
+      method,
+      headers: requestHeaders,
+      data: requestBody,
       timeout: 10000
     });
     
@@ -722,4 +777,4 @@ async function sendWorkWechatNotification(
     }
     throw error;
   }
-} 
+}

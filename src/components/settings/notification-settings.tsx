@@ -230,8 +230,35 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
       }
       case "Webhook": {
         const url = form.querySelector('input[name="webhookUrl"]') as HTMLInputElement;
+        const method = form.querySelector('select[name="webhookMethod"]') as HTMLSelectElement;
+        const contentType = form.querySelector('select[name="webhookContentType"]') as HTMLSelectElement;
+        const headers = form.querySelector('textarea[name="webhookHeaders"]') as HTMLTextAreaElement;
+        const bodyTemplate = form.querySelector('textarea[name="webhookBodyTemplate"]') as HTMLTextAreaElement;
+        
+        // 解析自定义请求头
+        const headersObj: Record<string, string> = {};
+        if (headers?.value) {
+          headers.value.split('\n').forEach(line => {
+            const trimmedLine = line.trim();
+            if (trimmedLine) {
+              const colonIndex = trimmedLine.indexOf(':');
+              if (colonIndex > 0) {
+                const key = trimmedLine.substring(0, colonIndex).trim();
+                const value = trimmedLine.substring(colonIndex + 1).trim();
+                if (key && value) {
+                  headersObj[key] = value;
+                }
+              }
+            }
+          });
+        }
+        
         return {
-          url: url?.value || ""
+          url: url?.value || "",
+          method: method?.value || "POST",
+          contentType: contentType?.value || "application/json",
+          headers: headersObj,
+          bodyTemplate: bodyTemplate?.value || ""
         };
       }
       case "微信推送": {
@@ -277,7 +304,11 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
         };
       case "Webhook":
         return {
-          url: ""
+          url: "",
+          method: "POST",
+          contentType: "application/json",
+          headers: {},
+          bodyTemplate: ""
         };
       case "微信推送":
         return {
@@ -424,6 +455,18 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
     // 重置Webhook表单
     const webhookUrlInput = form.querySelector('input[name="webhookUrl"]') as HTMLInputElement;
     if (webhookUrlInput) webhookUrlInput.value = "";
+
+    const webhookMethodSelect = form.querySelector('select[name="webhookMethod"]') as HTMLSelectElement;
+    if (webhookMethodSelect) webhookMethodSelect.value = "POST";
+
+    const webhookContentTypeSelect = form.querySelector('select[name="webhookContentType"]') as HTMLSelectElement;
+    if (webhookContentTypeSelect) webhookContentTypeSelect.value = "application/json";
+
+    const webhookHeadersTextarea = form.querySelector('textarea[name="webhookHeaders"]') as HTMLTextAreaElement;
+    if (webhookHeadersTextarea) webhookHeadersTextarea.value = "";
+
+    const webhookBodyTemplateTextarea = form.querySelector('textarea[name="webhookBodyTemplate"]') as HTMLTextAreaElement;
+    if (webhookBodyTemplateTextarea) webhookBodyTemplateTextarea.value = "";
     
     // 重置微信推送表单
     const pushUrlInput = form.querySelector('input[name="pushUrl"]') as HTMLInputElement;
@@ -845,36 +888,169 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
                       defaultValue={currentEditingNotification?.config?.url as string || ""}
                     />
                     <p className="mt-1 text-xs dark:text-foreground text-light-text-secondary">
-                      接收通知的URL地址
+                      接收通知的URL地址，支持变量占位符如 {`{monitorName}`}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-medium dark:text-foreground text-light-text-primary">HTTP方法</label>
+                      <select 
+                        name="webhookMethod"
+                        className="mt-1 w-full px-3 py-2 rounded-lg border border-primary/20 bg-dark-nav dark:bg-dark-nav bg-light-nav dark:text-foreground text-light-text-primary focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        defaultValue={currentEditingNotification?.config?.method as string || "POST"}
+                      >
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="PATCH">PATCH</option>
+                        <option value="DELETE">DELETE</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs font-medium dark:text-foreground text-light-text-primary">Content-Type</label>
+                      <select 
+                        name="webhookContentType"
+                        className="mt-1 w-full px-3 py-2 rounded-lg border border-primary/20 bg-dark-nav dark:bg-dark-nav bg-light-nav dark:text-foreground text-light-text-primary focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        defaultValue={currentEditingNotification?.config?.contentType as string || "application/json"}
+                      >
+                        <option value="application/json">application/json</option>
+                        <option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</option>
+                        <option value="text/plain">text/plain</option>
+                        <option value="text/xml">text/xml</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium dark:text-foreground text-light-text-primary">自定义请求头（可选）</label>
+                    <textarea 
+                      name="webhookHeaders"
+                      rows={4}
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-primary/20 bg-dark-nav dark:bg-dark-nav bg-light-nav dark:text-foreground text-light-text-primary focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all font-mono text-xs"
+                      placeholder={`Authorization: Bearer your-token
+X-Custom-Header: custom-value
+Content-Type: application/json`}
+                      defaultValue={(() => {
+                        const headers = currentEditingNotification?.config?.headers as Record<string, string>;
+                        if (!headers) return "";
+                        return Object.entries(headers)
+                          .map(([key, value]) => `${key}: ${value}`)
+                          .join('\n');
+                      })()}
+                    />
+                    <p className="mt-1 text-xs dark:text-foreground text-light-text-secondary">
+                      每行一个请求头，格式：Header-Name: header-value
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium dark:text-foreground text-light-text-primary">请求体模板（可选）</label>
+                    <textarea 
+                      name="webhookBodyTemplate"
+                      rows={8}
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-primary/20 bg-dark-nav dark:bg-dark-nav bg-light-nav dark:text-foreground text-light-text-primary focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all font-mono text-xs"
+                      placeholder={`{
+  "text": "监控项 {monitorName} 状态变更为 {status}",
+  "attachments": [{
+    "title": "监控详情",
+    "text": "{message}"
+  }]
+}`}
+                      defaultValue={currentEditingNotification?.config?.bodyTemplate as string || ""}
+                    />
+                    <p className="mt-1 text-xs dark:text-foreground text-light-text-secondary">
+                      支持变量占位符，留空则使用系统默认格式
                     </p>
                   </div>
                   
-                  {/* 添加Webhook数据格式说明 */}
+                  {/* 变量说明 */}
                   <div className="mt-3 p-4 bg-primary/5 rounded-lg border border-primary/10">
-                    <h3 className="text-sm font-medium mb-3 dark:text-foreground text-light-text-primary">Webhook通知数据格式</h3>
-                    <div className="overflow-x-auto">
-                      <pre className="text-xs bg-dark-nav/70 dark:bg-dark-nav/70 bg-light-nav/70 p-3 rounded-md whitespace-pre">
-{`{
-  "event": "status_change",
-  "timestamp": "2093-09-28T08:15:30.123Z",
-  "monitor": {
-    "name": "监控项名称",
-    "type": "http",
-    "status": "正常",             // 中文状态: 正常, 异常, 等待
-    "status_code": 1,            // 数字状态码: 1=正常, 0=异常, 2=等待
-    "time": "2093-09-28 16:15:30",
-    "message": "监控详细信息"
-  },
-  "failure_info": {              // 仅在状态为异常时存在
-    "count": 5,                  // 失败次数
-    "first_failure_time": "2093-09-28 16:00:30",
-    "last_failure_time": "2093-09-28 16:15:30",
-    "duration_minutes": 15       // 失败持续时间(分钟)
-  }
-}`}
-                      </pre>
+                    <h3 className="text-sm font-medium mb-3 dark:text-foreground text-light-text-primary">可用变量</h3>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="font-mono text-primary">{`{monitorName}`}</span>
+                        <span className="ml-2 dark:text-foreground/70 text-light-text-secondary">监控项名称</span>
+                      </div>
+                      <div>
+                        <span className="font-mono text-primary">{`{monitorType}`}</span>
+                        <span className="ml-2 dark:text-foreground/70 text-light-text-secondary">监控类型</span>
+                      </div>
+                      <div>
+                        <span className="font-mono text-primary">{`{status}`}</span>
+                        <span className="ml-2 dark:text-foreground/70 text-light-text-secondary">状态（正常/异常/等待）</span>
+                      </div>
+                      <div>
+                        <span className="font-mono text-primary">{`{statusCode}`}</span>
+                        <span className="ml-2 dark:text-foreground/70 text-light-text-secondary">状态码（1/0/2）</span>
+                      </div>
+                      <div>
+                        <span className="font-mono text-primary">{`{time}`}</span>
+                        <span className="ml-2 dark:text-foreground/70 text-light-text-secondary">检查时间</span>
+                      </div>
+                      <div>
+                        <span className="font-mono text-primary">{`{message}`}</span>
+                        <span className="ml-2 dark:text-foreground/70 text-light-text-secondary">详细信息</span>
+                      </div>
+                      <div>
+                        <span className="font-mono text-primary">{`{failureCount}`}</span>
+                        <span className="ml-2 dark:text-foreground/70 text-light-text-secondary">失败次数</span>
+                      </div>
+                      <div>
+                        <span className="font-mono text-primary">{`{failureDuration}`}</span>
+                        <span className="ml-2 dark:text-foreground/70 text-light-text-secondary">失败持续时间</span>
+                      </div>
                     </div>
-                    <p className="text-xs mt-3 dark:text-foreground/60 text-light-text-secondary">系统通过POST请求发送JSON格式数据，Content-Type为application/json</p>
+                  </div>
+
+                  {/* 平台示例 */}
+                  <div className="mt-3 p-4 bg-primary/5 rounded-lg border border-primary/10">
+                    <h3 className="text-sm font-medium mb-3 dark:text-foreground text-light-text-primary">常见平台配置示例</h3>
+                    <div className="space-y-3">
+                      <details className="text-xs">
+                        <summary className="cursor-pointer font-medium dark:text-foreground text-light-text-primary">飞书机器人</summary>
+                        <div className="mt-2 p-2 bg-dark-nav/50 dark:bg-dark-nav/50 rounded text-xs">
+                          <p className="mb-2"><strong>Content-Type:</strong> application/json</p>
+                          <p className="mb-2"><strong>请求体模板:</strong></p>
+                          <pre className="whitespace-pre-wrap">{`{
+  "msg_type": "text",
+  "content": {
+    "text": "【{monitorName}】状态变更为：{status}\\n消息：{message}\\n时间：{time}"
+  }
+}`}</pre>
+                        </div>
+                      </details>
+                      
+                      <details className="text-xs">
+                        <summary className="cursor-pointer font-medium dark:text-foreground text-light-text-primary">钉钉机器人</summary>
+                        <div className="mt-2 p-2 bg-dark-nav/50 dark:bg-dark-nav/50 rounded text-xs">
+                          <p className="mb-2"><strong>Content-Type:</strong> application/json</p>
+                          <p className="mb-2"><strong>请求体模板:</strong></p>
+                          <pre className="whitespace-pre-wrap">{`{
+  "msgtype": "markdown",
+  "markdown": {
+    "title": "监控告警",
+    "text": "## 监控状态变更\\n\\n**监控名称**: {monitorName}\\n**状态**: {status}\\n**时间**: {time}\\n\\n{message}"
+  }
+}`}</pre>
+                        </div>
+                      </details>
+                      
+                      <details className="text-xs">
+                        <summary className="cursor-pointer font-medium dark:text-foreground text-light-text-primary">企业微信机器人</summary>
+                        <div className="mt-2 p-2 bg-dark-nav/50 dark:bg-dark-nav/50 rounded text-xs">
+                          <p className="mb-2"><strong>Content-Type:</strong> application/json</p>
+                          <p className="mb-2"><strong>请求体模板:</strong></p>
+                          <pre className="whitespace-pre-wrap">{`{
+  "msgtype": "markdown",
+  "markdown": {
+    "content": "## 监控状态变更\\n\\n**监控名称**: {monitorName}\\n**状态**: {status}\\n**时间**: {time}\\n\\n{message}"
+  }
+}`}</pre>
+                        </div>
+                      </details>
+                    </div>
                   </div>
                 </div>
               )}
