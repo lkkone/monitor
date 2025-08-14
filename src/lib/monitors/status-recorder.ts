@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { Monitor } from '@prisma/client';
 import { CheckResult } from './checker';
+import { generateUltraCompactId } from '../utils/ultra-compact-id';
+import { generateCompactMessage } from '../utils/compact-message';
 
 interface RecordStatusParams {
   monitorId: string;
@@ -8,18 +10,24 @@ interface RecordStatusParams {
   message: string;
   ping?: number;
   details?: Record<string, unknown>;
+  monitorType?: string;
 }
 
 export async function recordMonitorStatus(params: RecordStatusParams) {
-  const { monitorId, status, message, ping, details } = params;
+  const { monitorId, status, message, ping, details, monitorType } = params;
 
   try {
+    // 使用7位超紧凑ID和消息优化存储：正常状态message为null，错误状态保留详细信息
+    const ultraCompactId = generateUltraCompactId();
+    const compactMessage = generateCompactMessage(status, message, ping);
+
     // 创建状态记录
     const record = await prisma.monitorStatus.create({
       data: {
+        id: ultraCompactId,
         monitorId,
         status,
-        message,
+        message: compactMessage,
         ping,
         details: details ? JSON.stringify(details) : null
       }

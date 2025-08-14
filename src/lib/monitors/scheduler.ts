@@ -2,8 +2,9 @@ import { Cron } from 'croner';
 import { prisma } from '../prisma';
 import { checkers } from './index';
 import { MONITOR_STATUS, MonitorHttpConfig, MonitorKeywordConfig, MonitorPortConfig, MonitorDatabaseConfig, MonitorPushConfig, MonitorIcmpConfig } from './types';
-import crypto from 'crypto';
 import { sendStatusChangeNotifications } from './notification-service';
+import { generateUltraCompactId } from '../utils/ultra-compact-id';
+import { generateCompactMessage } from '../utils/compact-message';
 
 // 定义监控项数据类型
 interface MonitorData {
@@ -72,7 +73,7 @@ export async function scheduleMonitor(monitorId: string) {
         } catch (error) {
           console.error(`监控检查异常 ${monitorId}:`, error);
           // 记录监控失败状态
-          await recordMonitorStatus(monitorId, MONITOR_STATUS.DOWN, '监控任务执行异常', null, monitorData.lastStatus || null);
+          await recordMonitorStatus(monitorId, MONITOR_STATUS.DOWN, '监控任务执行异常', null, monitorData.lastStatus || null, monitorData.type);
         }
       });
     } else if (monitorData.interval <= 3600) {
@@ -87,7 +88,7 @@ export async function scheduleMonitor(monitorId: string) {
         } catch (error) {
           console.error(`监控检查异常 ${monitorId}:`, error);
           // 记录监控失败状态
-          await recordMonitorStatus(monitorId, MONITOR_STATUS.DOWN, '监控任务执行异常', null, monitorData.lastStatus || null);
+          await recordMonitorStatus(monitorId, MONITOR_STATUS.DOWN, '监控任务执行异常', null, monitorData.lastStatus || null, monitorData.type);
         }
       });
     } else {
@@ -108,7 +109,7 @@ export async function scheduleMonitor(monitorId: string) {
         } catch (error) {
           console.error(`监控检查异常 ${monitorId}:`, error);
           // 记录监控失败状态
-          await recordMonitorStatus(monitorId, MONITOR_STATUS.DOWN, '监控任务执行异常', null, monitorData.lastStatus || null);
+          await recordMonitorStatus(monitorId, MONITOR_STATUS.DOWN, '监控任务执行异常', null, monitorData.lastStatus || null, monitorData.type);
         }
       });
     }
@@ -225,7 +226,7 @@ async function executeMonitorCheck(monitorId: string) {
       if (newStatus === MONITOR_STATUS.DOWN) {
         // 失败状态，记录并发送通知
         message = `推送超时: 最后推送时间 ${lastPushTime ? new Date(lastPushTime).toLocaleString() : '未知'}`;
-        await recordMonitorStatus(monitorId, newStatus, message, null, lastStatus);
+        await recordMonitorStatus(monitorId, newStatus, message, null, lastStatus, 'push');
       } else if (newStatus === MONITOR_STATUS.UP && lastStatus === MONITOR_STATUS.DOWN) {
         // 从失败恢复为成功，发送恢复通知
         message = `推送恢复正常: 最后推送时间 ${new Date(lastPushTime).toLocaleString()}`;
@@ -382,7 +383,7 @@ async function executeMonitorCheck(monitorId: string) {
   }
 
   // 记录监控状态
-  await recordMonitorStatus(monitorId, status, message, ping, monitorData.lastStatus || null);
+  await recordMonitorStatus(monitorId, status, message, ping, monitorData.lastStatus || null, monitorData.type);
 
   // 更新最后检查时间和下次检查时间
   const lastCheckAt = new Date();
@@ -403,16 +404,23 @@ async function recordMonitorStatus(
   status: number, 
   message: string, 
   ping: number | null,
-  prevStatus: number | null
+  prevStatus: number | null,
+  monitorType?: string
 ) {
   const timestamp = new Date();
   
+  // 使用7位超紧凑ID，比UUID短81%，比原紧凑ID短42%
+  const ultraCompactId = generateUltraCompactId();
+  
+  // 使用紧凑消息策略：正常状态存储null，错误状态保留详细信息
+  const compactMessage = generateCompactMessage(status, message, ping || undefined);
+  
   await prisma.$executeRaw`
     INSERT INTO "MonitorStatus" ("id", "monitorId", "status", "message", "ping", "timestamp")
-    VALUES (${crypto.randomUUID()}, ${monitorId}, ${status}, ${message}, ${ping}, ${timestamp})
+    VALUES (${ultraCompactId}, ${monitorId}, ${status}, ${compactMessage}, ${ping}, ${timestamp})
   `;
 
-  // 触发状态变更通知
+  // 触发状态变更通知时使用原始消息
   try {
     await sendStatusChangeNotifications(monitorId, status, message, prevStatus);
   } catch (error) {
