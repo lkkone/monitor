@@ -76,7 +76,7 @@ export function Header() {
       <nav className="glass-effect fixed top-0 left-80 right-0 h-16 border-b border-primary/10 z-50">
         <div className="container mx-auto px-4 h-full flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <span className="text-xl font-bold text-primary">酷监控</span>
+            <span className="text-xl font-bold text-primary">Monitor</span>
             <span className="dark:text-white/80 text-light-text-secondary">状态速览</span>
           </div>
           <div className="flex items-center space-x-4">

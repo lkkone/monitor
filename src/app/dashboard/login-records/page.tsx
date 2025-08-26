@@ -5,7 +5,7 @@ import Link from 'next/link';
 import LoginRecordsTable from './login-records-table';
 
 export const metadata = {
-  title: '登录记录 - 酷监控',
+  title: '登录记录 - Monitor',
   description: '查看您的登录记录和登录历史'
 };
 

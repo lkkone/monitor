@@ -265,7 +265,7 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
         const pushUrl = form.querySelector('input[name="pushUrl"]') as HTMLInputElement;
         return {
           pushUrl: pushUrl?.value || "",
-          titleTemplate: "酷监控 - {monitorName} 状态变更",
+          titleTemplate: "Monitor - {monitorName} 状态变更",
           contentTemplate: "## 监控状态变更通知\n\n- **监控名称**: {monitorName}\n- **监控类型**: {monitorType}\n- **当前状态**: {status}\n- **变更时间**: {time}\n\n{message}"
         };
       }
@@ -313,7 +313,7 @@ export function NotificationSettings({ onNotificationChange }: NotificationSetti
       case "微信推送":
         return {
           pushUrl: "",
-          titleTemplate: "酷监控 - {monitorName} 状态变更",
+          titleTemplate: "Monitor - {monitorName} 状态变更",
           contentTemplate: "## 监控状态变更通知\n\n- **监控名称**: {monitorName}\n- **监控类型**: {monitorType}\n- **当前状态**: {status}\n- **变更时间**: {time}\n\n{message}"
         };
       case "钉钉推送":
@@ -1121,7 +1121,7 @@ Content-Type: application/json`}
                        <li>在钉钉群中添加&ldquo;自定义机器人&rdquo;</li>
                        <li>安全设置选择&ldquo;加签&rdquo;方式（推荐）或&ldquo;自定义关键词&rdquo;</li>
                        <li>如选择加签方式，请将生成的密钥填入上方&ldquo;加签密钥&rdquo;字段</li>
-                       <li>如选择关键词方式，请添加&ldquo;酷监控&rdquo;作为关键词</li>
+                       <li>如选择关键词方式，请添加&ldquo;Monitor&rdquo;作为关键词</li>
                        <li>复制Webhook地址到上方URL字段</li>
                      </ol>
                     <div className="mt-3 p-3 bg-orange-500/10 rounded-lg border border-orange-500/20">

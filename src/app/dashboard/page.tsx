@@ -364,7 +364,7 @@ function Sidebar({ setSelectedMonitor, activeMonitorId }: { setSelectedMonitor: 
             setSelectedMonitor(null);
             setActiveItems([]);
           }}
-        >酷监控</div>
+        >Monitor</div>
         <button 
           className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-2.5 rounded-button hover:opacity-90 transition-opacity flex items-center space-x-2 w-full mb-5 justify-center"
           onClick={() => setIsMonitorFormOpen(true)}

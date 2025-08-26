@@ -94,7 +94,7 @@ export default function SetupForm() {
               </div>
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-primary">欢迎使用酷监控</h1>
+          <h1 className="text-3xl font-bold text-primary">欢迎使用Monitor</h1>
           <p className="text-xl text-foreground mt-2">系统初始化</p>
         </div>
         
@@ -190,7 +190,7 @@ export default function SetupForm() {
                     <i className="fas fa-circle-notch fa-spin mr-2"></i> 正在初始化...
                   </span>
                 ) : (
-                  '开始使用酷监控'
+                  '开始使用Monitor'
                 )}
               </button>
             </form>
@@ -199,7 +199,7 @@ export default function SetupForm() {
       </div>
       
       <div className="text-center mt-6 text-foreground/60 text-sm">
-        <p>酷监控 · 高颜值的网站和接口监控工具</p>
+        <p>Monitor · 李开开站点状态监控</p>
       </div>
     </div>
   );

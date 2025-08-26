@@ -105,11 +105,11 @@ async function testEmailNotification(name: string, config: EmailConfig) {
     const info = await transporter.sendMail({
       from: username || email,
       to: email,
-      subject: `酷监控 - 测试通知 - ${name}`,
+      subject: `Monitor - 测试通知 - ${name}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #6366F1; border-radius: 10px;">
-          <h2 style="color: #6366F1;">🔔 酷监控通知测试</h2>
-          <p>您好，这是来自 <strong>酷监控</strong> 系统的测试通知邮件。</p>
+          <h2 style="color: #6366F1;">🔔 Monitor通知测试</h2>
+          <p>您好，这是来自 <strong>Monitor</strong> 系统的测试通知邮件。</p>
           <p>通知渠道名称: <strong>${name}</strong></p>
           <p>如果您收到此邮件，表示您的邮件通知设置已配置成功！</p>
           <hr style="border-top: 1px solid #EEE; margin: 20px 0;">
@@ -153,7 +153,7 @@ async function testWebhookNotification(name: string, config: WebhookConfig) {
         status: '正常',  // 中文状态描述
         status_code: 1,  // 状态码: 1=正常
         time: formatDateTime(),
-        message: '这是一条来自酷监控的测试通知'
+        message: '这是一条来自Monitor的测试通知'
       },
       // 添加失败信息结构，与实际通知保持一致
       failure_info: null
@@ -224,10 +224,10 @@ async function testDingTalkNotification(name: string, config: DingTalkConfig) {
     
     // 构建测试消息内容
     let content = '';
-    const title = `酷监控 - 测试通知 - ${name}`;
+    const title = `Monitor - 测试通知 - ${name}`;
     
     // 使用Markdown消息格式
-    content = `## 🔔 酷监控通知测试\n\n` +
+    content = `## 🔔 Monitor通知测试\n\n` +
       `- **通知渠道名称**: ${name}\n` +
       `- **测试时间**: ${formatDateTime()}\n\n` +
       `如果您收到此消息，表示您的钉钉推送设置已配置成功！`;
@@ -346,8 +346,8 @@ async function testWechatNotification(name: string, config: WechatConfig) {
   
   try {
     // 准备测试数据
-    const title = '酷监控 - 测试通知';
-    const content = `## 酷监控通知测试\n\n这是来自酷监控系统的测试通知。\n\n- **通知渠道**: ${name}\n- **测试时间**: ${formatDateTime()}\n\n如果您收到此通知，表示您的微信推送设置已配置成功！`;
+    const title = 'Monitor - 测试通知';
+    const content = `## Monitor通知测试\n\n这是来自Monitor系统的测试通知。\n\n- **通知渠道**: ${name}\n- **测试时间**: ${formatDateTime()}\n\n如果您收到此通知，表示您的微信推送设置已配置成功！`;
     
     console.log(`开始测试微信推送: ${name}, URL: ${pushUrl}`);
     console.log(`微信推送测试数据: 标题=${title}, 内容=${content}`);
@@ -415,7 +415,7 @@ async function testWorkWechatNotification(name: string, config: WorkWechatConfig
     console.log(`开始测试企业微信推送: ${name}, URL: ${webhookUrl}`);
     
     // 构建测试消息内容
-    const content = `## 🔔 酷监控通知测试\n\n` +
+    const content = `## 🔔 Monitor通知测试\n\n` +
       `- **通知渠道名称**: ${name}\n` +
       `- **测试时间**: ${formatDateTime()}\n\n` +
       `如果您收到此消息，表示您的企业微信推送设置已配置成功！`;

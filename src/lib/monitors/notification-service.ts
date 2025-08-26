@@ -395,7 +395,7 @@ async function sendEmailNotification(
   });
   
   // 构建邮件内容
-  const subject = `酷监控 - ${data.monitorName} 状态${data.statusText}`;
+  const subject = `Monitor - ${data.monitorName} 状态${data.statusText}`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #6366F1; border-radius: 10px;">
       <h2 style="color: #6366F1;">🔔 监控状态变更通知</h2>
@@ -568,7 +568,7 @@ async function sendWechatNotification(
   }
   
   // 替换模板中的变量
-  let title = titleTemplate || "酷监控 - {monitorName} 状态{statusText}";
+  let title = titleTemplate || "Monitor - {monitorName} 状态{statusText}";
   let content = contentTemplate || 
     "## 监控状态变更通知\n\n" +
     "- **监控名称**: {monitorName}\n" +
@@ -616,7 +616,7 @@ async function sendDingTalkNotification(
   
   // 构建消息内容
   let content = '';
-  const title = `酷监控 - ${data.monitorName} 状态${data.statusText}`;
+  const title = `Monitor - ${data.monitorName} 状态${data.statusText}`;
   
   // 使用Markdown消息格式
   content = `## 🔔 监控状态变更通知\n\n` +

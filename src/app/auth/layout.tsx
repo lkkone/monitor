@@ -8,9 +8,9 @@ export default function AuthLayout({
       <div className="w-full max-w-md z-10 relative">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600">
-            酷监控
+            Monitor
           </h1>
-          <p className="text-foreground mt-2">高颜值网站和接口监控工具</p>
+          <p className="text-foreground mt-2">李开开站点状态监控</p>
         </div>
         <div className="relative">
           {children}

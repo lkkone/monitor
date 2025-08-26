@@ -10,8 +10,8 @@ export function AboutSettings() {
           <i className="fas fa-chart-line text-3xl"></i>
         </div>
         
-        <h3 className="text-xl font-bold text-primary mb-2">酷监控</h3>
-        <p className="text-sm dark:text-foreground/80 text-light-text-secondary mb-4">高颜值的监控工具</p>
+        <h3 className="text-xl font-bold text-primary mb-2">Monitor</h3>
+        <p className="text-sm dark:text-foreground/80 text-light-text-secondary mb-4">李开开站点状态监控</p>
         
         
         <div className="mt-6 space-x-2">
