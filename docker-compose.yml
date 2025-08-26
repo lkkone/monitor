@@ -9,7 +9,7 @@ services:
     volumes:
       # 挂载本地目录，用于持久化SQLite数据库
       # 首次启动时会自动初始化数据库
-      - ~/coolmonitor_data:/app/data
+      - ~/data:/app/data
     environment:
       - NODE_ENV=production
       - PORT=3333
@@ -22,4 +22,6 @@ services:
       # - PROXY_USERNAME=your-proxy-username
       # - PROXY_PASSWORD=your-proxy-password
 
+networks:
+  lkk_network:
 # 不再需要定义卷，因为直接使用本地目录 
